@@ -1,4 +1,6 @@
 import React from 'react';
+import nervoxLogo from '../assets/images/nervox_logo_1783881857606.jpg';
+import nervoxBanner from '../assets/images/nervox_banner_1783881869825.jpg';
 import {
   Globe,
   Gamepad2,
@@ -60,6 +62,17 @@ export default function SponsorView() {
         </div>
       </div>
 
+      {/* Dynamic Wide-screen Hero Banner */}
+      <div className="relative rounded-3xl overflow-hidden border border-red-500/20 shadow-[0_0_35px_rgba(255,45,45,0.1)] group">
+        <img
+          src={nervoxBanner}
+          alt="Nervox Hosting Banner"
+          className="w-full h-auto aspect-[2.8/1] object-cover transition-transform duration-700 group-hover:scale-[1.01]"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#020202] via-transparent to-transparent opacity-60" />
+      </div>
+
       {/* Main Showcase Grid Card Container */}
       <div className="relative rounded-[24px] bg-[#090909] border border-red-500/20 p-6 md:p-10 shadow-[0_0_50px_rgba(255,45,45,0.06)] overflow-hidden">
         {/* Subtle tech grid background pattern */}
@@ -77,21 +90,13 @@ export default function SponsorView() {
               <div className="absolute inset-0 bg-[#141414] rounded-2xl" />
               
               {/* Logo Box */}
-              <div className="relative h-40 w-40 md:h-48 md:w-48 bg-[#0C0C0C] border-2 border-red-500/30 rounded-2xl flex flex-col items-center justify-center p-4 shadow-2xl transition duration-500 group-hover:scale-[1.02] group-hover:border-red-500">
-                {/* Visual Server Icon combined with text */}
-                <div className="relative flex flex-col items-center justify-center space-y-3">
-                  <div className="p-3 bg-red-500/10 text-red-500 rounded-2xl border border-red-500/20 shadow-[0_0_15px_rgba(255,45,45,0.1)] group-hover:animate-pulse">
-                    <Server className="h-10 w-10 md:h-12 md:w-12" />
-                  </div>
-                  <div>
-                    <span className="block text-lg font-black font-sans uppercase tracking-widest text-white leading-none">
-                      NERVOX
-                    </span>
-                    <span className="block text-[10px] font-bold font-mono tracking-widest text-red-500 uppercase mt-1 leading-none">
-                      HOSTING
-                    </span>
-                  </div>
-                </div>
+              <div className="relative h-40 w-40 md:h-48 md:w-48 bg-[#0C0C0C] border-2 border-red-500/30 rounded-2xl overflow-hidden flex flex-col items-center justify-center shadow-2xl transition duration-500 group-hover:scale-[1.02] group-hover:border-red-500">
+                <img
+                  src={nervoxLogo}
+                  alt="Nervox Hosting Logo"
+                  className="w-full h-full object-cover rounded-2xl"
+                  referrerPolicy="no-referrer"
+                />
               </div>
             </div>
 
