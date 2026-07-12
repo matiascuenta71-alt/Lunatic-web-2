@@ -1,0 +1,408 @@
+{
+  "users": [
+    {
+      "id": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "email": "matiascuenta71@gmail.com",
+      "username": "Antonio",
+      "role": "Owner",
+      "isVerified": true,
+      "createdAt": "2026-07-11T20:59:58.269Z",
+      "isSuspended": false,
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Antonio",
+      "profileBackground": "bg-black",
+      "passwordHash": "ad4eb905c720db97ff47668a230392f7:053156301cf00d261cb19e3d3a6adf49da992d00a24a9a7ac1bc6c44acc46b14a2d02667ac799e360be15c37bd10497da7192a9a68300b7a02714e14505bb6a9"
+    },
+    {
+      "id": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "email": "feijoocabrera8@gmail.com",
+      "username": "Usuario",
+      "role": "Owner",
+      "isVerified": true,
+      "createdAt": "2026-07-12T12:15:55.472Z",
+      "isSuspended": false,
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Usuario",
+      "profileBackground": "bg-slate-900",
+      "passwordHash": "a4c633ae7eafb48a2eb2a3b9667190ca:c998a18dd64de687ca547eecff6297c19f5c8defdd22fff7a50a7a52f3836250ef7c5b19c3c7ce2b2e1b3385f96eaaf56287ce30253fe7234b575a57333dee42"
+    }
+  ],
+  "resources": [
+    {
+      "id": "2f5cb871-b7ec-4f90-8a2c-02c4ecd16273",
+      "name": "Prueba",
+      "description": "Prueba",
+      "category": "Plugins",
+      "imageUrl": "https://status.nervox.net/",
+      "minRole": "VIP",
+      "downloadMethod": "file",
+      "downloadUrl": "/uploads/resource_1783859358166_GUIPlus.jar",
+      "fileName": "GUIPlus.jar",
+      "createdAt": "2026-07-12T12:28:47.365Z"
+    }
+  ],
+  "streamingAccounts": [],
+  "announcements": [],
+  "polls": [],
+  "giveaways": [],
+  "events": [],
+  "activityLogs": [
+    {
+      "id": "87eeb9c9-b3c1-464d-b1aa-33a6f137dda4",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "ACTUALIZAR_PERFIL",
+      "details": "Perfil actualizado.",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:54:13.483Z"
+    },
+    {
+      "id": "a1da6b5d-9e38-45d9-a522-783c929f1cb7",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "ACTUALIZAR_PERFIL",
+      "details": "Perfil actualizado.",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:54:13.039Z"
+    },
+    {
+      "id": "85a73e53-1c9b-4ef9-a162-2797fe91e5cd",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "CONFIGURAR_COOLDOWN",
+      "details": "Estableció el cooldown del chat en 10 segundos.",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:52:52.143Z"
+    },
+    {
+      "id": "d14c6924-10ae-4d3a-baeb-056334d2158e",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "CREAR_RESEÑA",
+      "details": "Dejó una reseña de 5 estrellas: \"La mejor comunidad carajo...\"",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:52:28.837Z"
+    },
+    {
+      "id": "5f626cd7-2eb6-4648-be18-76b5e2835a99",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "LOGIN",
+      "details": "Inicio de sesión exitoso",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:51:17.998Z"
+    },
+    {
+      "id": "c65182b9-027f-4390-8867-97f941d2b2a1",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "LOGOUT",
+      "details": "Cierre de sesión",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:51:08.080Z"
+    },
+    {
+      "id": "06966684-564d-4707-acde-32d5d42d3b49",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "LOGIN",
+      "details": "Inicio de sesión exitoso",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:37:41.984Z"
+    },
+    {
+      "id": "e4d7045c-f6a4-4de5-ba05-7a36e9ab33f6",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "userEmail": "feijoocabrera8@gmail.com",
+      "action": "LOGOUT",
+      "details": "Cierre de sesión",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:37:31.644Z"
+    },
+    {
+      "id": "624f1249-aed4-4742-994a-47356d748aeb",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "userEmail": "feijoocabrera8@gmail.com",
+      "action": "CREAR_SOLICITUD",
+      "details": "Creó solicitud de recurso: \"Settup\" en \"Plugins\"",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:33:21.413Z"
+    },
+    {
+      "id": "1baba1f9-31da-4c58-83cb-8ecfde38b9fb",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "userEmail": "feijoocabrera8@gmail.com",
+      "action": "LOGIN",
+      "details": "Inicio de sesión exitoso",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:33:00.731Z"
+    },
+    {
+      "id": "d8ca8810-2bba-4ccc-bfdb-af2b5b450586",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "LOGOUT",
+      "details": "Cierre de sesión",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:32:45.294Z"
+    },
+    {
+      "id": "57c78ebd-8083-4206-872b-58e2ae509ab4",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "DESCARGA_RECURSO",
+      "details": "Descargó el recurso: \"Prueba\"",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:32:30.143Z"
+    },
+    {
+      "id": "512f262f-9d76-4521-9f5f-3b86bcd8d7a7",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "EDITAR_RECURSO",
+      "details": "Recurso editado: \"Prueba\"",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:32:22.871Z"
+    },
+    {
+      "id": "fd4ca713-8145-4af7-a848-ae4769ca5d4e",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "CREAR_COMENTARIO",
+      "details": "Comentó en el recurso: \"Prueba\"",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:31:49.641Z"
+    },
+    {
+      "id": "a357c808-08e2-4547-ac3c-2f8243c5f59b",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "DESCARGA_RECURSO",
+      "details": "Descargó el recurso: \"Prueba\"",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:29:24.938Z"
+    },
+    {
+      "id": "dc7e7c0f-5afb-4c7a-b906-e5371bf609a7",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "EDITAR_RECURSO",
+      "details": "Recurso editado: \"Prueba\"",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:29:18.173Z"
+    },
+    {
+      "id": "203e36db-3f78-4c47-9f67-8a381df3743d",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "CREAR_RECURSO",
+      "details": "Recurso creado: \"Prueba\" (Plugins), Rol mínimo: Usuario",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:28:47.365Z"
+    },
+    {
+      "id": "d2b61009-e175-4450-9320-8ac230a2f718",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "CAMBIAR_ROL",
+      "details": "Cambió el rol de feijoocabrera8@gmail.com de \"Recursos\" a \"Usuario\"",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:16:38.629Z"
+    },
+    {
+      "id": "f3ec2406-2e33-435c-bb21-b9d1e1280b09",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "CAMBIAR_ROL",
+      "details": "Cambió el rol de feijoocabrera8@gmail.com de \"Usuario\" a \"Recursos\"",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:16:36.641Z"
+    },
+    {
+      "id": "838038e8-b78b-40c5-a761-d3643b976bb2",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "LOGIN",
+      "details": "Inicio de sesión exitoso",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:16:29.695Z"
+    },
+    {
+      "id": "a1dbfddc-4873-4f05-944e-18fe175b74d7",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "userEmail": "feijoocabrera8@gmail.com",
+      "action": "LOGOUT",
+      "details": "Cierre de sesión",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:16:21.875Z"
+    },
+    {
+      "id": "6cc8bddd-f501-4c26-86a1-575495607587",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "userEmail": "feijoocabrera8@gmail.com",
+      "action": "REGISTRO",
+      "details": "Usuario registrado y verificado automáticamente como Usuario",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:15:55.474Z"
+    },
+    {
+      "id": "c2e1e9e3-4e4d-432f-b1c2-79790496913d",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "LOGOUT",
+      "details": "Cierre de sesión",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-12T12:15:34.332Z"
+    }
+  ],
+  "verificationCodes": [],
+  "sessions": {
+    "eyJpZCI6ImNhNTZmM2YyLWY4NzEtNDg5Yy04OTE1LTYyYmQ1YzZkMWQzMSIsImVtYWlsIjoiZmVpam9vY2FicmVyYThAZ21haWwuY29tIiwidXNlcm5hbWUiOiJVc3VhcmlvIiwicm9sZSI6IlVzdWFyaW8iLCJpc1ZlcmlmaWVkIjp0cnVlLCJjcmVhdGVkQXQiOiIyMDI2LTA3LTEyVDEyOjE1OjU1LjQ3MloiLCJhdmF0YXJVcmwiOiJodHRwczovL2FwaS5kaWNlYmVhci5jb20vNy54L2lkZW50aWNvbi9zdmc/c2VlZD1Vc3VhcmlvIiwicHJvZmlsZUJhY2tncm91bmQiOiJiZy1zbGF0ZS05MDAiLCJpc1N1c3BlbmRlZCI6ZmFsc2UsInBhc3N3b3JkSGFzaCI6ImE0YzYzM2FlN2VhZmI0OGEyZWIyYTNiOTY2NzE5MGNhOmM5OThhMThkZDY0ZGU2ODdjYTU0N2VlY2ZmNjI5N2MxOWY1YzhkZWZkZDIyZmZmN2E1MGE3YTUyZjM4MzYyNTBlZjdjNWIxOWMzYzdjZTJiMmUxYjMzODVmOTZlYWFmNTYyODdjZTMwMjUzZmU3MjM0YjU3NWE1NzMzM2RlZTQyIn0=": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+    "eyJpZCI6IjAwNjIwZTZlLWJhMDctNGZlMi1iZjIzLTkzMzY1MWVkNzA3MCIsImVtYWlsIjoibWF0aWFzY3VlbnRhNzFAZ21haWwuY29tIiwidXNlcm5hbWUiOiJBbnRvbmlvIiwicm9sZSI6Ik93bmVyIiwiaXNWZXJpZmllZCI6dHJ1ZSwiY3JlYXRlZEF0IjoiMjAyNi0wNy0xMVQyMDo1OTo1OC4yNjlaIiwiYXZhdGFyVXJsIjoiaHR0cHM6Ly9hcGkuZGljZWJlYXIuY29tLzcueC9pZGVudGljb24vc3ZnP3NlZWQ9QW50b25pbyIsInByb2ZpbGVCYWNrZ3JvdW5kIjoiYmctZ3JhZGllbnQtdG8tYnIgZnJvbS1zbGF0ZS05NTAgdmlhLXB1cnBsZS05NTAgdG8tc2xhdGUtOTUwIiwiaXNTdXNwZW5kZWQiOmZhbHNlLCJwYXNzd29yZEhhc2giOiJhZDRlYjkwNWM3MjBkYjk3ZmY0NzY2OGEyMzAzOTJmNzowNTMxNTYzMDFjZjAwZDI2MWNiMTllM2QzYTZhZGY0OWRhOTkyZDAwYTI0YTlhN2FjMWJjNmM0NGFjYzQ2YjE0YTJkMDI2NjdhYzc5OWUzNjBiZTE1YzM3YmQxMDQ5N2RhNzE5MmE5YTY4MzAwYjdhMDI3MTRlMTQ1MDViYjZhOSJ9": "00620e6e-ba07-4fe2-bf23-933651ed7070"
+  },
+  "comments": [
+    {
+      "id": "edd303f5-3244-4e49-a490-e00666f22ee1",
+      "resourceId": "2f5cb871-b7ec-4f90-8a2c-02c4ecd16273",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "username": "Antonio",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Antonio",
+      "content": "El peor recurso xdd",
+      "createdAt": "2026-07-12T12:31:49.641Z"
+    }
+  ],
+  "chatMessages": [
+    {
+      "id": "60281465-4741-489c-accb-24b5fbf7fe4a",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "username": "Antonio",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Antonio",
+      "role": "Owner",
+      "content": "Oa",
+      "createdAt": "2026-07-12T12:18:26.991Z"
+    },
+    {
+      "id": "ccdff7db-69bc-442c-8054-74e38a4c3736",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "username": "Antonio",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Antonio",
+      "role": "Owner",
+      "content": "👏",
+      "createdAt": "2026-07-12T12:18:40.924Z"
+    },
+    {
+      "id": "139b10f6-b352-43a3-a8f1-6292c86f9419",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "username": "Antonio",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Antonio",
+      "role": "Owner",
+      "content": "Ah",
+      "createdAt": "2026-07-12T12:18:46.006Z"
+    },
+    {
+      "id": "7365798d-5dbe-4b00-85ce-aad17eef6197",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "username": "Usuario",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Usuario",
+      "role": "Usuario",
+      "content": "Ieidk",
+      "createdAt": "2026-07-12T12:36:51.115Z"
+    },
+    {
+      "id": "f8c4bcaa-5488-4f6f-9d33-11deefc853bf",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "username": "Usuario",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Usuario",
+      "role": "Usuario",
+      "content": "A",
+      "createdAt": "2026-07-12T12:36:53.988Z"
+    },
+    {
+      "id": "6a7b747f-e675-4f46-bcc1-62b2b0431fcf",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "username": "Usuario",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Usuario",
+      "role": "Usuario",
+      "content": "Buenas",
+      "createdAt": "2026-07-12T12:36:58.458Z"
+    },
+    {
+      "id": "7c27e53d-d176-46ad-ba45-dfba16d2eec3",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "username": "Usuario",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Usuario",
+      "role": "Usuario",
+      "content": "Ah",
+      "createdAt": "2026-07-12T12:37:11.246Z"
+    },
+    {
+      "id": "51de70d3-9243-4694-8e6e-d411b48d9bc6",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "username": "Antonio",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Antonio",
+      "role": "Owner",
+      "content": "A",
+      "createdAt": "2026-07-12T12:47:23.002Z"
+    }
+  ],
+  "resourceRequests": [
+    {
+      "id": "5808f617-852a-4dfe-9a19-4a1ec18b64dc",
+      "userId": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
+      "userEmail": "feijoocabrera8@gmail.com",
+      "username": "Usuario",
+      "category": "Plugins",
+      "name": "Settup",
+      "description": "Prueba",
+      "referenceLink": "",
+      "status": "Pendiente",
+      "internalComments": [],
+      "createdAt": "2026-07-12T12:33:21.413Z",
+      "updatedAt": "2026-07-12T12:33:21.413Z"
+    }
+  ],
+  "downloadLogs": [
+    {
+      "id": "28467b49-e597-47d4-9e9d-fb0eb8d23f98",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "username": "Antonio",
+      "resourceId": "2f5cb871-b7ec-4f90-8a2c-02c4ecd16273",
+      "resourceName": "Prueba",
+      "category": "Plugins",
+      "ip": "127.0.0.1",
+      "device": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+      "status": "Completada",
+      "createdAt": "2026-07-12T12:32:30.142Z"
+    },
+    {
+      "id": "00294f2d-10e8-4657-aba9-399d26f67e98",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "username": "Antonio",
+      "resourceId": "2f5cb871-b7ec-4f90-8a2c-02c4ecd16273",
+      "resourceName": "Prueba",
+      "category": "Plugins",
+      "ip": "127.0.0.1",
+      "device": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36",
+      "status": "Completada",
+      "createdAt": "2026-07-12T12:29:24.938Z"
+    }
+  ],
+  "reviews": [
+    {
+      "id": "4a100858-f793-419c-95a4-51faf4e6721e",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "username": "Antonio",
+      "userEmail": "matiascuenta71@gmail.com",
+      "userRole": "Owner",
+      "avatarUrl": "https://api.dicebear.com/7.x/identicon/svg?seed=Antonio",
+      "rating": 5,
+      "comment": "La mejor comunidad carajo",
+      "hearts": [
+        "00620e6e-ba07-4fe2-bf23-933651ed7070"
+      ],
+      "replies": [],
+      "createdAt": "2026-07-12T12:52:28.837Z"
+    }
+  ],
+  "chatCooldown": 10
+}

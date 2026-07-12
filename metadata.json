@@ -1,0 +1,6 @@
+{
+  "name": "Lunatic Community Web",
+  "description": "Plataforma web moderna y segura para Lunatic Community, con sistema de roles, recursos premium, streaming gratuito, votaciones y panel de administración.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
