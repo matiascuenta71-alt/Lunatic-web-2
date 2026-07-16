@@ -28,6 +28,8 @@ export interface User {
   avatarUrl?: string;
   profileBackground?: string; // Predefined key or custom URL
   isSuspended: boolean;
+  roleExpiresAt?: string; // ISO string when temporary role expires
+  originalRole?: UserRole; // Role to restore when temp role expires
 }
 
 export enum ResourceCategory {
@@ -131,6 +133,7 @@ export interface Giveaway {
   winner?: { userId: string; username: string };
   creatorId: string;
   creatorName: string;
+  minRole?: UserRole;
 }
 
 export interface CommunityEvent {
@@ -237,4 +240,50 @@ export interface Review {
   replies: ReviewReply[];
   createdAt: string;
 }
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  role: UserRole;
+  duration: string; // e.g., "30s", "10m", "24h", "7d", "30d", "90d" or "Permanente"
+  maxUses: number;
+  useCount: number;
+  expiresAt?: string; // Optional expiration ISO string
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface PromoCodeRedeem {
+  id: string;
+  codeId: string;
+  code: string;
+  userId: string;
+  username: string;
+  userEmail: string;
+  ip: string;
+  redeemedAt: string;
+  status: 'Exitoso' | 'Fallido';
+  details?: string;
+}
+
+export interface Donation {
+  id: string;
+  userId: string;
+  userEmail: string;
+  username: string;
+  title: string;
+  description: string;
+  category: ResourceCategory;
+  imageUrl?: string;
+  downloadMethod: 'file' | 'link';
+  downloadUrl?: string; // URL or relative local path
+  fileName?: string;
+  version?: string;
+  tags?: string[];
+  status: 'Pendiente' | 'Aprobada' | 'Rechazada';
+  observation?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 

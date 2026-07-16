@@ -24,7 +24,8 @@ import {
   Check,
   Download,
   RefreshCw,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Gift
 } from 'lucide-react';
 import { UserRole, ResourceCategory, ROLE_HIERARCHY } from '../types.js';
 
@@ -50,9 +51,178 @@ export default function AdminPanel({
   onRefreshData
 }: AdminPanelProps) {
   const isOwnerOrCoOwner = userRole === UserRole.Owner || userRole === UserRole.CoOwner;
-  const [activeSubTab, setActiveSubTab] = useState<'users' | 'resources' | 'streaming' | 'logs' | 'downloads'>(
+  const [activeSubTab, setActiveSubTab] = useState<'users' | 'resources' | 'streaming' | 'logs' | 'downloads' | 'codes' | 'donations'>(
     isOwnerOrCoOwner ? 'users' : 'resources'
   );
+
+  // Promo codes state
+  const [promoCodes, setPromoCodes] = useState<any[]>([]);
+  const [promoCodeRedeems, setPromoCodeRedeems] = useState<any[]>([]);
+  const [codesLoading, setCodesLoading] = useState(false);
+  
+  // Create code form state
+  const [newCodeVal, setNewCodeVal] = useState('');
+  const [newCodeRole, setNewCodeRole] = useState<string>(UserRole.VIP);
+  const [durationValue, setDurationValue] = useState<number>(30);
+  const [durationUnit, setDurationUnit] = useState<string>('d');
+  const [newCodeMaxUses, setNewCodeMaxUses] = useState<number>(1);
+  const [newCodeExpiresAt, setNewCodeExpiresAt] = useState<string>('');
+
+  const fetchPromoCodes = async () => {
+    if (!token) return;
+    setCodesLoading(true);
+    try {
+      const res = await fetch('/api/admin/codes', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPromoCodes(data.codes || []);
+        setPromoCodeRedeems(data.redeems || []);
+      }
+    } catch (err) {
+      console.error('Error fetching promo codes:', err);
+    } finally {
+      setCodesLoading(false);
+    }
+  };
+
+  const handleCreateCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/admin/codes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          code: newCodeVal.trim(),
+          role: newCodeRole,
+          duration: durationUnit === 'Permanente' ? 'Permanente' : `${durationValue}${durationUnit}`,
+          maxUses: Number(newCodeMaxUses),
+          expiresAt: newCodeExpiresAt ? new Date(newCodeExpiresAt).toISOString() : undefined
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo crear el código.');
+      }
+      showToast('¡Código creado con éxito!');
+      setNewCodeVal('');
+      setNewCodeExpiresAt('');
+      fetchPromoCodes();
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleToggleCode = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/codes/${id}/toggle`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo cambiar el estado del código.');
+      }
+      showToast(data.message || 'Código actualizado.');
+      fetchPromoCodes();
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteCode = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este código permanentemente?')) return;
+    try {
+      const res = await fetch(`/api/admin/codes/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo eliminar el código.');
+      }
+      showToast('Código de promoción eliminado.');
+      fetchPromoCodes();
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  // Donations state
+  const [adminDonations, setAdminDonations] = useState<any[]>([]);
+  const [donationsLoading, setDonationsLoading] = useState(false);
+  const [reviewingDonationId, setReviewingDonationId] = useState<string | null>(null);
+  const [donationReviewStatus, setDonationReviewStatus] = useState<'Aprobada' | 'Rechazada'>('Aprobada');
+  const [donationReviewMinRole, setDonationReviewMinRole] = useState<string>(UserRole.Usuario);
+  const [donationReviewObservation, setDonationReviewObservation] = useState('');
+
+  const fetchAdminDonations = async () => {
+    if (!token) return;
+    setDonationsLoading(true);
+    try {
+      const res = await fetch('/api/donations', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAdminDonations(data.donations || []);
+      }
+    } catch (err) {
+      console.error('Error fetching donations:', err);
+    } finally {
+      setDonationsLoading(false);
+    }
+  };
+
+  const handleReviewDonation = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/donations/${id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: donationReviewStatus,
+          observation: donationReviewObservation.trim(),
+          minRole: donationReviewMinRole
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo procesar el aporte.');
+      }
+      showToast(`Aporte ${donationReviewStatus === 'Aprobada' ? 'aprobado y publicado' : 'rechazado'} con éxito!`);
+      setReviewingDonationId(null);
+      setDonationReviewObservation('');
+      fetchAdminDonations();
+      onRefreshData(); // to refresh resources as well
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const handleDeleteDonation = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este aporte?')) return;
+    try {
+      const res = await fetch(`/api/admin/donations/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo eliminar el aporte.');
+      }
+      showToast('Aporte eliminado con éxito.');
+      fetchAdminDonations();
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
 
   // Download Logs states
   const [downloadLogs, setDownloadLogs] = useState<any[]>([]);
@@ -91,6 +261,14 @@ export default function AdminPanel({
       fetchDownloadLogs();
     }
   }, [activeSubTab, dlSearch, dlCategory, dlStatus, dlSort]);
+
+  useEffect(() => {
+    if (activeSubTab === 'codes') {
+      fetchPromoCodes();
+    } else if (activeSubTab === 'donations') {
+      fetchAdminDonations();
+    }
+  }, [activeSubTab]);
 
   const exportLogsToCSV = () => {
     if (downloadLogs.length === 0) return;
@@ -185,8 +363,13 @@ export default function AdminPanel({
   
   // Search states
   const [userSearch, setUserSearch] = useState('');
+  const [userPage, setUserPage] = useState(1);
   const [resourceSearch, setResourceSearch] = useState('');
   const [streamingSearch, setStreamingSearch] = useState('');
+
+  useEffect(() => {
+    setUserPage(1);
+  }, [userSearch]);
 
   // Resource Form states
   const [resourceFormOpen, setResourceFormOpen] = useState(false);
@@ -668,6 +851,9 @@ export default function AdminPanel({
     return u.username.toLowerCase().includes(s) || u.email.toLowerCase().includes(s) || u.role.toLowerCase().includes(s);
   });
 
+  const usersPerPage = 10;
+  const paginatedUsers = filteredUsers.slice((userPage - 1) * usersPerPage, userPage * usersPerPage);
+
   const filteredResources = resources.filter(r => {
     const s = resourceSearch.toLowerCase();
     return r.name.toLowerCase().includes(s) || r.category.toLowerCase().includes(s) || r.description.toLowerCase().includes(s);
@@ -769,6 +955,22 @@ export default function AdminPanel({
               Gestión de Streaming
             </button>
             <button
+              onClick={() => setActiveSubTab('codes')}
+              className={`px-4 py-2 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition shrink-0 ${
+                activeSubTab === 'codes' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              Códigos Canjeables
+            </button>
+            <button
+              onClick={() => setActiveSubTab('donations')}
+              className={`px-4 py-2 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition shrink-0 ${
+                activeSubTab === 'donations' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              Gestión de Aportes
+            </button>
+            <button
               onClick={() => setActiveSubTab('downloads')}
               className={`px-4 py-2 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition shrink-0 ${
                 activeSubTab === 'downloads' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-300'
@@ -827,7 +1029,7 @@ export default function AdminPanel({
                         <td colSpan={5} className="text-center py-8 text-slate-500">Ningún usuario coincide con los criterios de búsqueda.</td>
                       </tr>
                     ) : (
-                      filteredUsers.map((u) => {
+                      paginatedUsers.map((u) => {
                         const isImmutable = IMMUTABLE_EMAILS.includes(u.email.toLowerCase());
                         const isTargetOwner = u.role === UserRole.Owner;
                         // Co-Owner can't touch Owners. Only Owner can touch Owners.
@@ -926,6 +1128,25 @@ export default function AdminPanel({
                   </tbody>
                 </table>
               </div>
+              {filteredUsers.length > usersPerPage && (
+                <div className="flex justify-between items-center bg-slate-950/60 px-6 py-3 border-t border-slate-800/60">
+                  <button
+                    disabled={userPage === 1}
+                    onClick={() => setUserPage(p => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-[10px] text-slate-500 font-mono">Página {userPage} de {Math.ceil(filteredUsers.length / usersPerPage)}</span>
+                  <button
+                    disabled={userPage * usersPerPage >= filteredUsers.length}
+                    onClick={() => setUserPage(p => p + 1)}
+                    className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1751,6 +1972,431 @@ export default function AdminPanel({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB CONTENT: CÓDIGOS CANJEABLES */}
+      {activeSubTab === 'codes' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-3">
+            <div>
+              <h3 className="font-display font-semibold text-sm text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                <Gift className="h-4 w-4 text-indigo-400" /> Sistema de Códigos Canjeables
+              </h3>
+              <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wide">
+                Crea, pausa o elimina códigos promocionales para asignación temporal de rangos
+              </p>
+            </div>
+            
+            <button
+              onClick={fetchPromoCodes}
+              disabled={codesLoading}
+              className="p-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl transition flex items-center gap-1.5 text-xs font-medium self-start sm:self-auto cursor-pointer"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${codesLoading ? 'animate-spin' : ''}`} />
+              <span>{codesLoading ? 'Actualizando...' : 'Actualizar'}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Create Code Form */}
+            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 h-fit">
+              <h4 className="font-display font-bold text-slate-200 text-xs uppercase tracking-wider">Crear Nuevo Código</h4>
+              
+              <form onSubmit={handleCreateCode} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">Código (Dejar vacío para auto-generar)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="E.G. NERVOX-PREMIUM"
+                      value={newCodeVal}
+                      onChange={(e) => setNewCodeVal(e.target.value.toUpperCase())}
+                      className="flex-1 px-3.5 py-2 bg-slate-950 border border-slate-850 rounded-xl text-slate-100 text-xs font-mono uppercase focus:border-indigo-500 focus:outline-none transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+                        setNewCodeVal(`LUNATIC-${rand}`);
+                      }}
+                      className="px-3 py-2 bg-slate-950 border border-slate-850 hover:border-slate-700 text-indigo-400 hover:text-indigo-300 rounded-xl text-xs font-mono transition cursor-pointer"
+                    >
+                      Gen
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">Rango / Rol a Otorgar</label>
+                  <select
+                    value={newCodeRole}
+                    onChange={(e) => setNewCodeRole(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-850 rounded-xl text-slate-300 text-xs focus:border-indigo-500 focus:outline-none transition"
+                  >
+                    {Object.values(UserRole).map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">Duración</label>
+                  <div className="flex gap-2">
+                    {durationUnit !== 'Permanente' && (
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={durationValue}
+                        onChange={(e) => setDurationValue(Math.max(1, Number(e.target.value)))}
+                        className="w-1/3 px-3.5 py-2 bg-slate-950 border border-slate-850 rounded-xl text-slate-100 text-xs font-mono focus:border-indigo-500 focus:outline-none transition"
+                        placeholder="Ej. 30"
+                      />
+                    )}
+                    <select
+                      value={durationUnit}
+                      onChange={(e) => setDurationUnit(e.target.value)}
+                      className={`px-3.5 py-2 bg-slate-950 border border-slate-850 rounded-xl text-slate-300 text-xs focus:border-indigo-500 focus:outline-none transition ${
+                        durationUnit === 'Permanente' ? 'w-full' : 'flex-1'
+                      }`}
+                    >
+                      <option value="s">s (Segundos)</option>
+                      <option value="m">m (Minutos)</option>
+                      <option value="h">h (Horas)</option>
+                      <option value="d">d (Días)</option>
+                      <option value="Permanente">Permanente</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">Usos Máximos</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newCodeMaxUses}
+                    onChange={(e) => setNewCodeMaxUses(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-850 rounded-xl text-slate-100 text-xs font-mono focus:border-indigo-500 focus:outline-none transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">Fecha Expiración Código (Opcional)</label>
+                  <input
+                    type="datetime-local"
+                    value={newCodeExpiresAt}
+                    onChange={(e) => setNewCodeExpiresAt(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-850 rounded-xl text-slate-100 text-xs font-mono focus:border-indigo-500 focus:outline-none transition"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-xl text-xs transition cursor-pointer"
+                >
+                  Crear Código
+                </button>
+              </form>
+            </div>
+
+            {/* List and Redeem History */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Active / Inactive Codes List */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                  <h4 className="font-display font-bold text-slate-200 text-xs uppercase tracking-wider">Códigos Disponibles ({promoCodes.length})</h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-950/20 text-slate-500 font-mono text-[9px] uppercase tracking-wider">
+                        <th className="px-5 py-3">Código</th>
+                        <th className="px-5 py-3">Rol Otorgado</th>
+                        <th className="px-5 py-3">Duración</th>
+                        <th className="px-5 py-3 text-center">Usos</th>
+                        <th className="px-5 py-3">Expiración</th>
+                        <th className="px-5 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-850 text-slate-300 text-[11px] font-mono">
+                      {promoCodes.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-center py-6 text-slate-500">No hay códigos creados todavía.</td>
+                        </tr>
+                      ) : (
+                        promoCodes.map((c) => {
+                          const isExpired = c.expiresAt && new Date() > new Date(c.expiresAt);
+                          const isLimitReached = c.currentUses >= c.maxUses;
+                          return (
+                            <tr key={c.id} className="hover:bg-slate-950/10 transition">
+                              <td className="px-5 py-3 font-bold text-indigo-400 select-all truncate max-w-[120px]" title={c.code}>
+                                {c.code}
+                              </td>
+                              <td className="px-5 py-3">
+                                <span className="inline-flex px-1.5 py-0.5 rounded bg-indigo-950 border border-indigo-900/50 text-indigo-300 font-sans font-semibold text-[10px]">
+                                  {c.role}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-slate-400">
+                                {c.duration === 'Permanent' ? 'Permanente' : c.duration}
+                              </td>
+                              <td className="px-5 py-3 text-center">
+                                <span className={isLimitReached ? 'text-red-400 font-bold' : 'text-slate-200'}>
+                                  {c.currentUses}/{c.maxUses}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-[10px] text-slate-500">
+                                {c.expiresAt ? (
+                                  <span className={isExpired ? 'text-red-500/80 font-semibold line-through' : ''}>
+                                    {new Date(c.expiresAt).toLocaleDateString()}
+                                  </span>
+                                ) : 'Ninguna'}
+                              </td>
+                              <td className="px-5 py-3 text-right space-x-1.5">
+                                <button
+                                  onClick={() => handleToggleCode(c.id)}
+                                  className={`px-2 py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
+                                    c.isActive 
+                                      ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20' 
+                                      : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                                  }`}
+                                >
+                                  {c.isActive ? 'Pausar' : 'Activar'}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCode(c.id)}
+                                  className="p-1 hover:bg-red-500/10 text-slate-500 hover:text-red-400 rounded transition cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Redeem History */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-800 bg-slate-900/50">
+                  <h4 className="font-display font-bold text-slate-200 text-xs uppercase tracking-wider">Historial de Canjes ({promoCodeRedeems.length})</h4>
+                </div>
+                <div className="overflow-x-auto max-h-[250px] overflow-y-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-950/20 text-slate-500 font-mono text-[9px] uppercase tracking-wider sticky top-0 backdrop-blur">
+                        <th className="px-5 py-2.5">Fecha</th>
+                        <th className="px-5 py-2.5">Código</th>
+                        <th className="px-5 py-2.5">Usuario</th>
+                        <th className="px-5 py-2.5">Rol Obtenido</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-850 text-slate-300 text-[11px] font-mono">
+                      {promoCodeRedeems.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="text-center py-6 text-slate-500">Ningún código canjeado todavía.</td>
+                        </tr>
+                      ) : (
+                        promoCodeRedeems.map((r) => (
+                          <tr key={r.id} className="hover:bg-slate-950/10 transition">
+                            <td className="px-5 py-2.5 text-slate-500 text-[10px]">
+                              {new Date(r.redeemedAt).toLocaleString()}
+                            </td>
+                            <td className="px-5 py-2.5 text-indigo-400 font-bold">{r.code}</td>
+                            <td className="px-5 py-2.5 text-slate-300">{r.username}</td>
+                            <td className="px-5 py-2.5 text-slate-400">{r.role}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUBTAB CONTENT: GESTIÓN DE APORTES */}
+      {activeSubTab === 'donations' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-3">
+            <div>
+              <h3 className="font-display font-semibold text-sm text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                <Gift className="h-4 w-4 text-indigo-400" /> Moderación de Aportes
+              </h3>
+              <p className="text-[10px] text-slate-500 font-mono uppercase tracking-wide">
+                Revisa los aportes enviados por los usuarios y publícalos automáticamente como Recursos
+              </p>
+            </div>
+            
+            <button
+              onClick={fetchAdminDonations}
+              disabled={donationsLoading}
+              className="p-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl transition flex items-center gap-1.5 text-xs font-medium self-start sm:self-auto cursor-pointer"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${donationsLoading ? 'animate-spin' : ''}`} />
+              <span>{donationsLoading ? 'Actualizando...' : 'Actualizar'}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
+            {adminDonations.length === 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center text-slate-500">
+                No hay aportes para moderar en este momento.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {adminDonations.map((d) => {
+                  const isReviewing = reviewingDonationId === d.id;
+                  return (
+                    <div key={d.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col h-full relative">
+                      {d.imageUrl && (
+                        <div className="h-40 w-full relative overflow-hidden bg-slate-950">
+                          <img src={d.imageUrl} alt={d.title} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
+                        </div>
+                      )}
+
+                      <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[10px] font-semibold uppercase tracking-wider">
+                              {d.category}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              d.status === 'Pendiente' ? 'bg-yellow-500/10 text-yellow-400' :
+                              d.status === 'Aprobada' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                            }`}>
+                              {d.status}
+                            </span>
+                          </div>
+
+                          <h4 className="font-display font-bold text-slate-100 text-sm leading-snug">{d.title}</h4>
+                          <p className="text-slate-400 text-xs line-clamp-3">{d.description}</p>
+                          
+                          <div className="pt-2 border-t border-slate-800/60 text-[11px] font-mono space-y-1 text-slate-500">
+                            <p>Enviado por: <span className="text-slate-300 font-sans">{d.username}</span></p>
+                            <p>Email: <span className="text-indigo-400">{d.userEmail}</span></p>
+                            <p>Método: <span className="text-slate-400 uppercase">{d.downloadMethod}</span></p>
+                            {d.fileName && <p className="truncate block">Archivo: <span className="text-slate-400">{d.fileName}</span></p>}
+                            {d.downloadUrl && (
+                              <p className="truncate block">
+                                URL: <a href={d.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline select-all">{d.downloadUrl}</a>
+                              </p>
+                            )}
+                            {d.observation && (
+                              <p className="mt-2 p-2 bg-slate-950/40 rounded border border-slate-800/40 text-[10px] text-amber-500 italic">
+                                Nota: {d.observation}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-slate-850">
+                          {isReviewing ? (
+                            <div className="space-y-3 bg-slate-950/40 p-3 rounded-xl border border-slate-850 animate-fadeIn text-xs">
+                              <div className="space-y-1.5">
+                                <label className="block text-[10px] text-slate-500 uppercase font-mono">Decisión</label>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setDonationReviewStatus('Aprobada')}
+                                    className={`flex-1 py-1 px-2 rounded-lg font-semibold transition cursor-pointer ${
+                                      donationReviewStatus === 'Aprobada' ? 'bg-green-600 text-white' : 'bg-slate-900 text-slate-400'
+                                    }`}
+                                  >
+                                    Aprobar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDonationReviewStatus('Rechazada')}
+                                    className={`flex-1 py-1 px-2 rounded-lg font-semibold transition cursor-pointer ${
+                                      donationReviewStatus === 'Rechazada' ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-400'
+                                    }`}
+                                  >
+                                    Rechazar
+                                  </button>
+                                </div>
+                              </div>
+
+                              {donationReviewStatus === 'Aprobada' && (
+                                <div className="space-y-1">
+                                  <label className="block text-[10px] text-slate-500 uppercase font-mono">Rol mínimo de descarga</label>
+                                  <select
+                                    value={donationReviewMinRole}
+                                    onChange={(e) => setDonationReviewMinRole(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200"
+                                  >
+                                    {Object.values(UserRole).map((r) => (
+                                      <option key={r} value={r}>{r}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+
+                              <div className="space-y-1">
+                                <label className="block text-[10px] text-slate-500 uppercase font-mono">Observación / Motivo</label>
+                                <textarea
+                                  placeholder="Nota para el usuario o motivo de rechazo..."
+                                  value={donationReviewObservation}
+                                  onChange={(e) => setDonationReviewObservation(e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200 text-xs h-16 focus:outline-none focus:border-indigo-500"
+                                />
+                              </div>
+
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleReviewDonation(d.id)}
+                                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-1.5 rounded-lg text-[11px] transition cursor-pointer"
+                                >
+                                  Confirmar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setReviewingDonationId(null)}
+                                  className="px-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 rounded-lg text-[11px] transition cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              {d.status === 'Pendiente' && (
+                                <button
+                                  onClick={() => {
+                                    setReviewingDonationId(d.id);
+                                    setDonationReviewStatus('Aprobada');
+                                  }}
+                                  className="flex-1 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 font-semibold py-1.5 rounded-xl text-xs transition cursor-pointer"
+                                >
+                                  Moderar Aporte
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeleteDonation(d.id)}
+                                className="p-2 hover:bg-red-500/10 text-slate-500 hover:text-red-400 border border-transparent hover:border-red-500/10 rounded-xl transition cursor-pointer"
+                                title="Eliminar aporte"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

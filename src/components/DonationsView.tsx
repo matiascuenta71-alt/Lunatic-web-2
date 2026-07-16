@@ -1,68 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import nervoxLogo from '../assets/images/nervox_logo_1783881857606.jpg';
-import nervoxBanner from '../assets/images/nervox_banner_1783881869825.jpg';
 import { ResourceCategory } from '../types.js';
 import {
-  Globe,
-  Gamepad2,
-  CreditCard,
-  Activity,
-  MessageSquare,
-  MapPin,
-  DollarSign,
-  Zap,
-  ExternalLink,
-  Shield,
-  Heart,
-  Cpu,
-  Sparkles,
-  Headphones,
-  CheckCircle2,
   Upload,
   Link2,
   FileText,
   AlertCircle,
+  CheckCircle2,
   Clock,
   Check,
   XCircle,
-  Eye,
-  Info
+  ExternalLink,
+  Info,
+  Sparkles,
+  ShieldCheck,
+  Award,
+  PlusCircle,
+  ChevronRight
 } from 'lucide-react';
+import { motion } from 'motion/react';
 
-interface SponsorViewProps {
+interface DonationsViewProps {
   currentUser: any;
   token: string;
 }
 
-export default function SponsorView({ currentUser, token }: SponsorViewProps) {
-  // Navigation nodes and prices for Nervox
-  const nodes = [
-    { name: 'Perú', flag: '🇵🇪', desc: 'Infraestructura Local en Lima' },
-    { name: 'Miami', flag: '🇺🇸', desc: 'Infraestructura USA Premium' }
-  ];
-
-  const prices = [
-    { location: '🇵🇪 Perú', price: 'Desde 1.20 USD/GB', target: 'VPS Minecraft & Linux' },
-    { location: '🇺🇸 Miami', price: 'Desde 2.00 USD/GB', target: 'VPS Ryzen de Alta Gama' }
-  ];
-
-  const features = [
-    { icon: Cpu, label: 'Alto rendimiento', desc: 'Procesadores Ryzen de última generación' },
-    { icon: Zap, label: 'Baja latencia', desc: 'Rutas optimizadas para toda Latinoamérica' },
-    { icon: Shield, label: 'Protección DDoS', desc: 'Mitigación avanzada para seguridad total' },
-    { icon: Gamepad2, label: 'Panel de juegos', desc: 'Administra tus servidores con Pterodactyl' },
-    { icon: Headphones, label: 'Soporte técnico', desc: 'Atención personalizada 24/7 en Discord' },
-    { icon: Activity, label: 'Estado en tiempo real', desc: 'Monitoreo de red constante y transparente' }
-  ];
-
-  const actionButtons = [
-    { label: 'Sitio Web', url: 'https://nervox.net/', icon: Globe },
-    { label: 'Panel de Juegos', url: 'https://panel.nervox.net/', icon: Gamepad2 },
-    { label: 'Área de Cliente', url: 'https://billing.nervox.net/', icon: CreditCard },
-    { label: 'Estado de Red', url: 'https://status.nervox.net/', icon: Activity },
-    { label: 'Comunidad Discord', url: 'https://discord.gg/nervox', icon: MessageSquare }
-  ];
-
+export default function DonationsView({ currentUser, token }: DonationsViewProps) {
   // Donation Submission Form State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -209,215 +171,48 @@ export default function SponsorView({ currentUser, token }: SponsorViewProps) {
   };
 
   return (
-    <div id="sponsor-nervox-view" className="space-y-10 max-w-6xl mx-auto py-4 px-2">
-      {/* Premium Sponsor Badge Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-red-500/10 pb-4 gap-4">
-        <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-mono font-extrabold uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20 shadow-[0_0_10px_rgba(255,45,45,0.15)]">
-            <Heart className="h-3 w-3 animate-pulse text-red-500" /> Aliado Premium / Patrocinador Oficial
+    <div id="donations-view-container" className="space-y-8 max-w-6xl mx-auto py-4 px-2">
+      
+      {/* Informative Welcome Banner */}
+      <div className="bg-[#09090b]/90 border border-slate-800 rounded-2xl p-6 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="space-y-2 text-center md:text-left z-10">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <Award className="h-3.5 w-3.5" /> Recompensas por Aporte
           </span>
-          <h2 className="font-display font-extrabold text-lg text-slate-100 tracking-tight mt-1">
-            Espacio Patrocinado por <span className="text-red-500 hover:shadow-[0_0_15px_rgba(255,45,45,0.5)] transition duration-300">Nervox Hosting</span>
-          </h2>
+          <h3 className="font-display font-extrabold text-xl text-[#f4f4f5] tracking-tight leading-none mt-1">
+            Donación y Publicación de Recursos
+          </h3>
+          <p className="text-slate-400 text-xs max-w-2xl leading-relaxed">
+            Comparte tus setups optimizados, plugins propios o configurados, modelos 3D y plantillas. Cada recurso donado pasa por un filtro de seguridad estricto y, tras ser aprobado, te otorga puntos de rango y reputación.
+          </p>
         </div>
-      </div>
-
-      {/* Dynamic Wide-screen Hero Banner */}
-      <div className="relative rounded-3xl overflow-hidden border border-red-500/20 shadow-[0_0_35px_rgba(255,45,45,0.1)] group">
-        <img
-          src={nervoxBanner}
-          alt="Nervox Hosting Banner"
-          className="w-full h-auto aspect-[2.8/1] object-cover transition-transform duration-700 group-hover:scale-[1.01]"
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#020202] via-transparent to-transparent opacity-60" />
-      </div>
-
-      {/* Main Showcase Grid Card Container */}
-      <div className="relative rounded-[24px] bg-[#090909] border border-red-500/20 p-6 md:p-10 shadow-[0_0_50px_rgba(255,45,45,0.06)] overflow-hidden">
-        {/* Subtle tech grid background pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,45,45,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,45,45,0.02)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none opacity-60" />
-        <div className="absolute top-[-20%] right-[-10%] w-[350px] h-[350px] bg-red-500/10 rounded-full filter blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-red-950/20 rounded-full filter blur-[100px] pointer-events-none" />
-
-        {/* Outer Desktop Columns / Mobile Centered Column */}
-        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          {/* LADO IZQUIERDO: Logo de Nervox Hosting */}
-          <div className="lg:col-span-4 flex flex-col items-center justify-center text-center space-y-4">
-            <div className="relative group">
-              {/* Outer Glowing Rings */}
-              <div className="absolute inset-[-6px] bg-gradient-to-tr from-red-600 to-red-500 rounded-3xl opacity-30 blur-md group-hover:opacity-60 transition duration-500" />
-              <div className="absolute inset-0 bg-[#141414] rounded-2xl" />
-              
-              {/* Logo Box */}
-              <div className="relative h-40 w-40 md:h-48 md:w-48 bg-[#0C0C0C] border-2 border-red-500/30 rounded-2xl overflow-hidden flex flex-col items-center justify-center shadow-2xl transition duration-500 group-hover:scale-[1.02] group-hover:border-red-500">
-                <img
-                  src={nervoxLogo}
-                  alt="Nervox Hosting Logo"
-                  className="w-full h-full object-cover rounded-2xl"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-            </div>
-
-            {/* Live Indicator */}
-            <div className="flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full">
-              <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[9px] font-mono font-bold text-red-400 uppercase tracking-widest">INFRAESTRUCTURA ACTIVA</span>
-            </div>
-          </div>
-
-          {/* LADO DERECHO: Detalles & Acciones */}
-          <div className="lg:col-span-8 space-y-6 text-center lg:text-left">
-            <div>
-              <h1 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-none uppercase font-sans">
-                NERVOX <span className="text-red-500 drop-shadow-[0_0_12px_rgba(239,68,68,0.55)] font-sans">HOSTING</span>
-              </h1>
-              <h3 className="text-sm md:text-lg font-semibold text-slate-200 mt-2 tracking-wide leading-relaxed">
-                Hosting VPS de alto rendimiento con infraestructura en <span className="text-red-400 font-bold border-b border-red-500/20 pb-0.5">Perú</span> y <span className="text-red-400 font-bold border-b border-red-500/20 pb-0.5">Miami</span>.
-              </h3>
-              <p className="text-slate-400 text-xs md:text-sm leading-relaxed mt-4 max-w-2xl">
-                Servidores optimizados para Minecraft, servidores privados virtuales (VPS) y proyectos corporativos de alta demanda. Disfruta de una infraestructura premium estable con hardware de última generación, baja latencia, mitigación DDoS avanzada y soporte especializado.
-              </p>
-            </div>
-
-            {/* Quick Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              {/* Card Nodos */}
-              <div className="bg-[#141414]/90 backdrop-blur border border-red-500/10 p-4 rounded-2xl flex items-start gap-3 transition hover:border-red-500/30 group">
-                <div className="p-2.5 bg-red-500/10 text-red-500 rounded-xl">
-                  <MapPin className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                  <span className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider font-semibold">📍 Nodos de Red</span>
-                  <div className="flex gap-2 items-center mt-1.5">
-                    {nodes.map((node, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-semibold text-slate-350">
-                        <span>{node.flag}</span>
-                        <span>{node.name}</span>
-                      </span>
-                    ))}
-                  </div>
-                  <span className="block text-[10px] text-slate-500 mt-1.5">Sistemas de ultra-baja latencia en Lima y Florida.</span>
-                </div>
-              </div>
-
-              {/* Card Precios */}
-              <div className="bg-[#141414]/90 backdrop-blur border border-red-500/10 p-4 rounded-2xl flex items-start gap-3 transition hover:border-red-500/30 group">
-                <div className="p-2.5 bg-red-500/10 text-red-500 rounded-xl">
-                  <DollarSign className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                  <span className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider font-semibold">💲 Planes Flexibles</span>
-                  <div className="space-y-1 mt-1.5">
-                    {prices.map((p, i) => (
-                      <div key={i} className="flex justify-between items-center text-[11px] font-sans gap-2">
-                        <span className="text-slate-400">{p.location}:</span>
-                        <span className="text-red-400 font-bold font-mono bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10">{p.price}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SECCIÓN INTERMEDIA: CARACTERÍSTICAS TECNOLÓGICAS (Bento-like Grid) */}
-        <div className="mt-10 pt-8 border-t border-red-500/10 space-y-4">
-          <h4 className="text-center font-display font-extrabold text-sm text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
-            <Sparkles className="h-4 w-4 text-red-500" /> Beneficios de Alto Rendimiento <Sparkles className="h-4 w-4 text-red-500" />
-          </h4>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {features.map((feat, index) => {
-              const IconComp = feat.icon;
-              return (
-                <div
-                  key={index}
-                  className="bg-[#121212] border border-red-500/5 hover:border-red-500/20 p-4 rounded-2xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(255,45,45,0.03)] hover:-translate-y-0.5 group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-red-500/5 text-red-500 rounded-xl group-hover:bg-red-500/15 group-hover:text-red-400 transition-all">
-                      <IconComp className="h-5 w-5" />
-                    </div>
-                    <span className="text-xs font-bold text-slate-200 uppercase tracking-wide group-hover:text-red-400 transition">
-                      {feat.label}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-2 leading-relaxed pl-1">
-                    {feat.desc}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* SECCIÓN INFERIOR: BOTONES DE ACCIÓN DIRECTA */}
-        <div className="mt-10 pt-8 border-t border-red-500/10 space-y-4 text-center">
-          <span className="block text-[10px] font-mono text-slate-500 uppercase tracking-widest font-extrabold">ACCEDER A LOS SERVICIOS DE NERVOX</span>
-          
-          <div className="flex flex-wrap justify-center items-center gap-3 md:gap-4">
-            {actionButtons.map((btn, index) => {
-              const IconComp = btn.icon;
-              return (
-                <a
-                  key={index}
-                  href={btn.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 text-white font-bold rounded-2xl text-xs transition duration-300 transform hover:scale-[1.03] shadow-[0_4px_15px_rgba(180,0,0,0.2)] hover:shadow-[0_0_25px_rgba(255,45,45,0.4)] group"
-                >
-                  <IconComp className="h-4 w-4 text-white group-hover:scale-110 transition duration-300" />
-                  <span>{btn.label}</span>
-                  <ExternalLink className="h-3 w-3 text-red-200/80" />
-                </a>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Trust reassurance banner */}
-      <div className="bg-[#121212] border border-red-500/10 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
-            <CheckCircle2 className="h-5 w-5" />
-          </div>
-          <div className="text-center sm:text-left">
-            <span className="block text-xs font-bold text-slate-200">Recomendado por la Administración de Lunatic</span>
-            <span className="block text-[10px] text-slate-500 mt-0.5">Nuestra infraestructura global y servidores premium corren en nodos dedicados de Nervox.</span>
-          </div>
-        </div>
-        <a
-          href="https://nervox.net/"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="px-4 py-2 bg-slate-950 border border-slate-800 hover:border-red-500/30 text-slate-400 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0"
-        >
-          <span>Visitar Sitio Oficial</span>
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
-      </div>
-
-      {/* ----------------------------------------------------------------- */}
-      {/* SECCIÓN DE APORTES DE LA COMUNIDAD (DONATION SUBMISSIONS)       */}
-      {/* ----------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-8 border-t border-slate-800">
         
-        {/* LADO IZQUIERDO: Formulario de Envío */}
-        <div className="lg:col-span-7 bg-slate-900 border border-slate-850 rounded-2xl p-6 space-y-6">
-          <div>
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-widest bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              Aportes de la Comunidad
+        <div className="flex gap-3 shrink-0 z-10">
+          <div className="bg-[#030303] px-4 py-3 rounded-xl border border-slate-800 text-center min-w-[120px]">
+            <span className="block text-xl font-bold font-display text-emerald-400">
+              {myDonations.filter(d => d.status === 'Aprobada').length}
             </span>
-            <h3 className="font-display font-extrabold text-base text-slate-100 tracking-tight mt-1">
-              Compartir una Configuración o Recurso
+            <span className="text-[9px] uppercase font-mono text-zinc-500 font-medium">Aprobados</span>
+          </div>
+          <div className="bg-[#030303] px-4 py-3 rounded-xl border border-slate-800 text-center min-w-[120px]">
+            <span className="block text-xl font-bold font-display text-amber-400">
+              {myDonations.filter(d => d.status === 'Pendiente').length}
+            </span>
+            <span className="text-[9px] uppercase font-mono text-zinc-500 font-medium">En Revisión</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid: Form Left, History Right */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* LEFT COLUMN: Donation submission form */}
+        <div className="lg:col-span-7 bg-slate-900 border border-slate-850 rounded-2xl p-6 space-y-6">
+          <div className="flex items-center gap-2">
+            <PlusCircle className="h-5 w-5 text-indigo-400" />
+            <h3 className="font-display font-extrabold text-base text-slate-100 tracking-tight">
+              Nuevo Formulario de Donación
             </h3>
-            <p className="text-[11px] text-slate-400 leading-normal mt-1">
-              ¿Tienes algún Plugin configurado, Setup, Modelo 3D o configuración de Discord útil? Envíanoslo. Tras ser revisado y aprobado por los dueños, se publicará en la biblioteca general.
-            </p>
           </div>
 
           <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -482,10 +277,10 @@ export default function SponsorView({ currentUser, token }: SponsorViewProps) {
                   accept="image/*"
                   onChange={(e) => handleFileChange(e, 'image')}
                   className="hidden"
-                  id="donation-image-input"
+                  id="donation-image-input-dedicated"
                 />
                 <label
-                  htmlFor="donation-image-input"
+                  htmlFor="donation-image-input-dedicated"
                   className="px-4 py-2 bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer transition flex items-center gap-1.5 shrink-0"
                 >
                   <Upload className="h-3.5 w-3.5" />
@@ -559,10 +354,10 @@ export default function SponsorView({ currentUser, token }: SponsorViewProps) {
                     type="file"
                     onChange={(e) => handleFileChange(e, 'file')}
                     className="hidden"
-                    id="donation-file-input"
+                    id="donation-file-input-dedicated"
                   />
                   <label
-                    htmlFor="donation-file-input"
+                    htmlFor="donation-file-input-dedicated"
                     className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold underline cursor-pointer mt-0.5 block"
                   >
                     selecciónalo desde tu ordenador
@@ -591,21 +386,21 @@ export default function SponsorView({ currentUser, token }: SponsorViewProps) {
                   <span>Enviando aporte...</span>
                 </>
               ) : (
-                <span>Enviar Aporte para Moderación</span>
+                <span>Enviar Recurso Donado</span>
               )}
             </button>
           </form>
         </div>
 
-        {/* LADO DERECHO: Historial de Aportes del Usuario */}
+        {/* RIGHT COLUMN: Donation history of user */}
         <div className="lg:col-span-5 bg-slate-900 border border-slate-850 rounded-2xl p-6 flex flex-col justify-between">
           <div className="space-y-4">
             <div>
               <h3 className="font-display font-extrabold text-base text-slate-100 tracking-tight">
-                Mis Aportes Enviados
+                Tus Donaciones Enviadas
               </h3>
               <p className="text-[11px] text-slate-500">
-                Historial de recursos que has compartido con la comunidad.
+                Estado y seguimiento de los recursos que has donado.
               </p>
             </div>
 
@@ -616,11 +411,11 @@ export default function SponsorView({ currentUser, token }: SponsorViewProps) {
             ) : myDonations.length === 0 ? (
               <div className="border border-dashed border-slate-800 rounded-xl p-8 text-center text-slate-500">
                 <FileText className="h-8 w-8 mx-auto text-slate-700 mb-2" />
-                <p className="text-xs">No has enviado ningún aporte aún.</p>
-                <p className="text-[10px] text-slate-600 mt-0.5">¡Envía tu primer aporte usando el formulario!</p>
+                <p className="text-xs">No has enviado ningún aporte de recurso aún.</p>
+                <p className="text-[10px] text-slate-600 mt-0.5">¡Sé el primero en aportar un recurso útil!</p>
               </div>
             ) : (
-              <div className="space-y-3.5 max-h-[380px] overflow-y-auto pr-1">
+              <div className="space-y-3.5 max-h-[420px] overflow-y-auto pr-1">
                 {myDonations.map((donation) => (
                   <div
                     key={donation.id}
@@ -685,12 +480,13 @@ export default function SponsorView({ currentUser, token }: SponsorViewProps) {
           <div className="mt-4 p-3.5 bg-indigo-950/20 border border-indigo-900/35 rounded-xl flex items-start gap-2.5">
             <Info className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
             <p className="text-[10px] text-slate-400 leading-normal">
-              Todos los aportes aprobados se agregarán automáticamente a la pestaña de <strong>Recursos Compartidos</strong>, ayudándote a subir tu rango dentro de la comunidad.
+              Todos los aportes aprobados son publicados de forma inmediata en la biblioteca de <strong>Recursos Premium</strong> de Lunatic Community.
             </p>
           </div>
         </div>
 
       </div>
+
     </div>
   );
 }

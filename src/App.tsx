@@ -27,7 +27,8 @@ import {
   Heart,
   History,
   Star,
-  MessageCircle
+  MessageCircle,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole, ResourceCategory, ROLE_HIERARCHY } from './types.js';
@@ -48,9 +49,11 @@ import ResourceRequestsView from './components/ResourceRequestsView.tsx';
 import LogsView from './components/LogsView.tsx';
 import SponsorView from './components/SponsorView.tsx';
 import ReviewsView from './components/ReviewsView.tsx';
+import DonationsView from './components/DonationsView.tsx';
+import lunaticLogo from './assets/images/lunatic_logo_1784202374899.jpg';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 
-type TabType = 'home' | 'resources' | 'streaming' | 'polls' | 'announcements' | 'vip' | 'events' | 'admin' | 'profile' | 'chat' | 'requests' | 'logs' | 'sponsor' | 'reviews';
+type TabType = 'home' | 'resources' | 'streaming' | 'polls' | 'announcements' | 'vip' | 'events' | 'admin' | 'profile' | 'chat' | 'requests' | 'logs' | 'sponsor' | 'reviews' | 'donations';
 
 interface TabRendererProps {
   tabKey: TabType;
@@ -358,7 +361,9 @@ const TabRenderer = React.memo(({
         />
       ) : null;
     case 'sponsor':
-      return <SponsorView />;
+      return <SponsorView currentUser={user} token={token!} />;
+    case 'donations':
+      return <DonationsView currentUser={user} token={token!} />;
     case 'reviews':
       return <ReviewsView currentUser={user} token={token!} />;
     default:
@@ -588,9 +593,17 @@ export default function App() {
 
       {/* MOBILE HEADER BAR */}
       <header className="md:hidden bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <h1 className="font-display font-bold text-lg tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-          LUNATIC
-        </h1>
+        <div className="flex items-center gap-2">
+          <img
+            src={lunaticLogo}
+            alt="LUNATIC logo"
+            className="h-7 w-7 rounded-lg object-cover border border-cyan-500/30 shadow-[0_0_8px_rgba(8,145,178,0.2)]"
+            referrerPolicy="no-referrer"
+          />
+          <h1 className="font-display font-extrabold text-base tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 uppercase leading-none">
+            LUNATIC
+          </h1>
+        </div>
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-1.5 text-slate-400 hover:text-white rounded-lg transition">
           {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -602,10 +615,22 @@ export default function App() {
       }`}>
         {/* Sidebar Header (Hidden on Mobile) */}
         <div className="p-6 border-b border-slate-800/80 hidden md:block">
-          <h1 className="font-display font-bold text-xl tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-            LUNATIC
-          </h1>
-          <span className="text-[10px] text-slate-500 font-mono tracking-widest uppercase block mt-1">Community Center</span>
+          <div className="flex items-center gap-3">
+            <div className="relative h-10 w-10 shrink-0 bg-[#06060c] border border-cyan-500/30 rounded-xl overflow-hidden shadow-md">
+              <img
+                src={lunaticLogo}
+                alt="Lunatic Logo"
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div>
+              <h1 className="font-display font-extrabold text-sm tracking-wider text-slate-100 uppercase leading-none">
+                LUNATIC
+              </h1>
+              <span className="text-[10px] font-mono font-bold text-cyan-400 uppercase tracking-widest block mt-0.5">COMMUNITY</span>
+            </div>
+          </div>
         </div>
 
         {/* Sidebar Navigation Items */}
@@ -666,6 +691,15 @@ export default function App() {
             >
               <ClipboardList className="h-4 w-4 text-emerald-400" />
               <span>📝・Solicitar Recursos</span>
+            </button>
+            <button
+              onClick={() => { setActiveTab('donations'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
+                activeTab === 'donations' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
+              }`}
+            >
+              <Upload className="h-4 w-4 text-cyan-400" />
+              <span>📥・Donar Recursos</span>
             </button>
             <button
               onClick={() => { setActiveTab('vip'); setMobileMenuOpen(false); }}
@@ -838,6 +872,8 @@ export default function App() {
                 ? 'Chat Global'
                 : activeTab === 'requests'
                 ? 'Solicitudes de Recursos'
+                : activeTab === 'donations'
+                ? 'Donaciones & Aportes de Recursos'
                 : activeTab === 'logs'
                 ? 'Canal de Logs & Auditoría'
                 : activeTab === 'sponsor'

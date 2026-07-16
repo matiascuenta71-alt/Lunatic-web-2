@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Gift, Calendar, Users, Plus, Trash2, Clock, Trophy, Check, Sparkles, MapPin, AlertTriangle, MessageSquare, Ticket } from 'lucide-react';
+import { Gift, Calendar, Users, Plus, Trash2, Clock, Trophy, Check, Sparkles, MapPin, AlertTriangle, MessageSquare, Ticket, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserRole, type Giveaway, type CommunityEvent } from '../types.js';
 
@@ -116,6 +116,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
   const [prize, setPrize] = useState('');
   const [requirements, setRequirements] = useState('');
   const [endDateInput, setEndDateInput] = useState('');
+  const [minRole, setMinRole] = useState<string>(UserRole.Usuario);
 
   // Event Form State
   const [eventTitle, setEventTitle] = useState('');
@@ -184,7 +185,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ prize, requirements, endDate: calculatedEndDate })
+        body: JSON.stringify({ prize, requirements, endDate: calculatedEndDate, minRole })
       });
       const data = await res.json();
 
@@ -194,6 +195,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
       setPrize('');
       setRequirements('');
       setEndDateInput('');
+      setMinRole(UserRole.Usuario);
       setShowCreateModal(false);
       fetchData();
     } catch (err: any) {
@@ -297,6 +299,27 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
       if (!res.ok) throw new Error(data.error || 'Error al realizar el sorteo.');
 
       setSuccess(`¡Sorteo finalizado! El ganador elegido es: ${data.giveaway.winner?.username || 'Nadie'}`);
+      fetchData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleRedrawWinner = async (giveawayId: string) => {
+    if (!window.confirm('¿Deseas volver a sortear un ganador para este sorteo? El ganador actual será excluido del resorteo.')) return;
+    setError(null);
+    setSuccess(null);
+    try {
+      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const res = await fetch(`/api/admin/giveaways/${giveawayId}/redraw`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || 'Error al volver a sortear.');
+
+      setSuccess(`¡Resorteo completado! El nuevo ganador es: ${data.giveaway.winner?.username || 'Nadie'}`);
       fetchData();
     } catch (err: any) {
       setError(err.message);
@@ -522,6 +545,19 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
                   </div>
 
                   <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Rango Mínimo Requerido</label>
+                    <select
+                      value={minRole}
+                      onChange={(e) => setMinRole(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-950 border border-slate-850 rounded-xl text-slate-300 text-xs focus:border-indigo-500 focus:outline-none transition"
+                    >
+                      {Object.values(UserRole).map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tiempo de Finalización (Duración)</label>
                     <input
                       type="text"
@@ -698,6 +734,12 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
 
                           {/* Requirements & Info */}
                           <div className="p-3 bg-slate-950/60 border border-slate-850/60 rounded-xl space-y-2">
+                            {giveaway.minRole && giveaway.minRole !== UserRole.Usuario && (
+                              <div className="text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg flex items-center gap-1.5 w-fit uppercase font-mono mb-2">
+                                <AlertTriangle className="h-3 w-3 text-amber-400" />
+                                <span>Rango Mínimo: {giveaway.minRole}</span>
+                              </div>
+                            )}
                             <div className="text-[11px] text-slate-400">
                               <span className="font-semibold text-slate-300">Requisitos:</span> {giveaway.requirements}
                             </div>
@@ -743,6 +785,17 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
                         )}
 
                         {/* Action buttons */}
+                        {isModerator && giveaway.winner && (
+                          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-850">
+                            <button
+                              onClick={() => handleRedrawWinner(giveaway.id)}
+                              className="w-full bg-amber-600/10 hover:bg-amber-600/20 border border-amber-500/20 text-amber-400 hover:text-amber-300 font-semibold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              <span>Volver a Sortear (Resortear)</span>
+                            </button>
+                          </div>
+                        )}
                         {!giveaway.winner && (
                           <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-850">
                             {!isClosed && !alreadyEntered && (

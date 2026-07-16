@@ -21,7 +21,10 @@ import {
   type ResourceRequest,
   type DownloadLog,
   RequestStatus,
-  type RequestComment
+  type RequestComment,
+  type PromoCode,
+  type PromoCodeRedeem,
+  type Donation
 } from './src/types.js';
 
 const app = express();
@@ -62,6 +65,9 @@ interface DBStructure {
   reviews: any[];
   chatCooldown?: number;
   sessionSecret?: string;
+  promoCodes?: PromoCode[];
+  promoCodeRedeems?: PromoCodeRedeem[];
+  donations?: Donation[];
 }
 
 const initialDb: DBStructure = {
@@ -81,7 +87,10 @@ const initialDb: DBStructure = {
   downloadLogs: [],
   reviews: [],
   chatCooldown: 3,
-  sessionSecret: crypto.randomBytes(32).toString('hex')
+  sessionSecret: crypto.randomBytes(32).toString('hex'),
+  promoCodes: [],
+  promoCodeRedeems: [],
+  donations: []
 };
 
 // Global DB in-memory cache
@@ -109,6 +118,9 @@ function loadDB() {
       db.resourceRequests = db.resourceRequests || [];
       db.downloadLogs = db.downloadLogs || [];
       db.reviews = db.reviews || [];
+      db.promoCodes = db.promoCodes || [];
+      db.promoCodeRedeems = db.promoCodeRedeems || [];
+      db.donations = db.donations || [];
       if (db.chatCooldown === undefined) {
         db.chatCooldown = 3;
       }
@@ -273,8 +285,50 @@ function checkAndAutoDrawGiveaways() {
   }
 }
 
+// Automatic check and enforcement for expired roles
+function checkAndEnforceRoleExpirations() {
+  const now = new Date();
+  let modified = false;
+  
+  db.users.forEach(user => {
+    if (user.roleExpiresAt) {
+      const expiresAt = new Date(user.roleExpiresAt);
+      if (now >= expiresAt) {
+        // Expired! Revert
+        const oldRole = user.role;
+        const newRole = user.originalRole || UserRole.Usuario;
+        
+        user.role = newRole;
+        delete user.roleExpiresAt;
+        delete user.originalRole;
+        modified = true;
+        
+        // Log to Activity Logs
+        const logId = crypto.randomUUID();
+        const expirationLog: ActivityLog = {
+          id: logId,
+          userId: user.id,
+          userEmail: user.email,
+          action: 'EXPIRACION_ROL_AUTOMATICO',
+          details: `El rol temporal "${oldRole}" de ${user.username} ha expirado. Restablecido a su rol anterior: "${newRole}".`,
+          createdAt: now.toISOString()
+        };
+        db.activityLogs = db.activityLogs || [];
+        db.activityLogs.unshift(expirationLog);
+        
+        console.log(`[ROLE EXPIRED] User ${user.username} reverted from ${oldRole} to ${newRole}`);
+      }
+    }
+  });
+  
+  if (modified) {
+    saveDB();
+  }
+}
+
 // Middleware: Authenticate User
 function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
+  checkAndEnforceRoleExpirations();
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ error: 'No autorizado. Se requiere token.' });
@@ -1627,7 +1681,7 @@ app.get('/api/giveaways', authenticate, (req, res) => {
 
 // Create a giveaway (Owner / Co-Owner Only)
 app.post('/api/admin/giveaways', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
-  const { prize, requirements, endDate } = req.body;
+  const { prize, requirements, endDate, minRole } = req.body;
   const user = (req as any).user as User;
 
   if (!prize || !endDate) {
@@ -1644,7 +1698,8 @@ app.post('/api/admin/giveaways', authenticate, requireRole(UserRole.CoOwner), (r
     createdAt: new Date().toISOString(),
     participants: [],
     creatorId: user.id,
-    creatorName: user.username
+    creatorName: user.username,
+    minRole: minRole as UserRole || undefined
   };
 
   db.giveaways.unshift(newGiveaway);
@@ -1682,6 +1737,16 @@ app.post('/api/giveaways/:id/enter', authenticate, (req, res) => {
     saveDB();
     res.status(400).json({ error: 'Este sorteo ha finalizado por fecha de cierre.' });
     return;
+  }
+
+  // Check minimum role if specified
+  if (giveaway.minRole) {
+    const userRoleLevel = ROLE_HIERARCHY[user.role] || 1;
+    const requiredRoleLevel = ROLE_HIERARCHY[giveaway.minRole] || 1;
+    if (userRoleLevel < requiredRoleLevel) {
+      res.status(403).json({ error: `No tienes el rango mínimo requerido para participar en este sorteo. Requiere al menos: ${giveaway.minRole}` });
+      return;
+    }
   }
 
   // Check if already participating
@@ -1760,6 +1825,64 @@ app.post('/api/admin/giveaways/:id/draw', authenticate, requireRole(UserRole.CoO
     user.email,
     'DIBUJAR_GANADOR_SORTEO',
     `Sorteo "${giveaway.prize}" finalizado. Ganador: ${winner.username}`,
+    req
+  );
+
+  res.json({ giveaway });
+});
+
+// Re-elect winner (Co-Owner / Owner Only)
+app.post('/api/admin/giveaways/:id/redraw', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
+  const { id } = req.params;
+  const admin = (req as any).user as User;
+
+  const giveaway = db.giveaways.find(g => g.id === id);
+  if (!giveaway) {
+    res.status(404).json({ error: 'Sorteo no encontrado.' });
+    return;
+  }
+
+  const oldWinner = giveaway.winner;
+  const oldWinnerId = oldWinner?.userId;
+
+  // Exclude previous winner
+  const eligibleParticipants = giveaway.participants.filter(p => p.userId !== oldWinnerId);
+
+  if (eligibleParticipants.length === 0) {
+    res.status(400).json({ error: 'No hay otros participantes elegibles para re-sortear.' });
+    return;
+  }
+
+  const randomIndex = Math.floor(Math.random() * eligibleParticipants.length);
+  const newWinner = eligibleParticipants[randomIndex];
+
+  giveaway.winner = newWinner;
+  giveaway.status = 'closed';
+
+  // Mention the new winner in Global Chat!
+  const systemMsg = {
+    id: crypto.randomUUID(),
+    userId: 'system',
+    username: 'Sorteos Lunatic',
+    avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=LunaticGiveaways',
+    role: UserRole.Owner,
+    content: `🎉 ¡Se ha vuelto a sortear el premio de **${giveaway.prize}**! Felicidades al nuevo ganador seleccionado: @${newWinner.username} 🎁✨`,
+    createdAt: new Date().toISOString()
+  };
+  db.chatMessages = db.chatMessages || [];
+  db.chatMessages.push(systemMsg);
+  if (db.chatMessages.length > 200) {
+    db.chatMessages = db.chatMessages.slice(-200);
+  }
+  broadcastMessage({ type: 'msg', message: systemMsg });
+
+  saveDB();
+
+  logActivity(
+    admin.id,
+    admin.email,
+    'RE_SORTEAR_GANADOR_SORTEO',
+    `Sorteo "${giveaway.prize}" re-sorteado por ${admin.username}. Ganador anterior: ${oldWinner ? oldWinner.username : 'Ninguno'} -> Nuevo Ganador: ${newWinner.username}`,
     req
   );
 
@@ -1989,10 +2112,44 @@ app.post('/api/admin/users/reset-password', authenticate, requireRole(UserRole.O
   });
 });
 
+function normalizeDuration(durationStr: string): string {
+  if (!durationStr) return 'Permanente';
+  let s = durationStr.toLowerCase().trim();
+  if (s.includes('permanente') || s.includes('permanent')) return 'Permanente';
+  
+  // Replace words
+  s = s.replace(/segundos?/, 's');
+  s = s.replace(/minutos?/, 'm');
+  s = s.replace(/horas?/, 'h');
+  s = s.replace(/días?|dias?/, 'd');
+  s = s.replace(/\s+/g, ''); // remove any spaces
+  
+  return s;
+}
+
+function getDurationMs(duration: string): number | null {
+  if (!duration || duration === 'Permanente' || duration === 'permanent') return null;
+  
+  const clean = duration.trim();
+  const match = clean.match(/^(\d+)(s|m|h|d)$/);
+  if (!match) return null;
+  
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+  
+  switch (unit) {
+    case 's': return value * 1000;
+    case 'm': return value * 60 * 1000;
+    case 'h': return value * 60 * 60 * 1000;
+    case 'd': return value * 24 * 60 * 60 * 1000;
+    default: return null;
+  }
+}
+
 // Change User Role (Owner / Co-Owner only)
 app.put('/api/admin/users/:id/role', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
   const { id } = req.params;
-  const { role } = req.body;
+  const { role, duration } = req.body;
   const admin = (req as any).user as User;
 
   if (!role || !Object.values(UserRole).includes(role)) {
@@ -2026,13 +2183,28 @@ app.put('/api/admin/users/:id/role', authenticate, requireRole(UserRole.CoOwner)
 
   const oldRole = user.role;
   user.role = role as UserRole;
+
+  // Process duration
+  const normDuration = normalizeDuration(duration);
+  const durationMs = getDurationMs(normDuration);
+
+  if (durationMs !== null) {
+    user.roleExpiresAt = new Date(Date.now() + durationMs).toISOString();
+    if (!user.originalRole) {
+      user.originalRole = oldRole;
+    }
+  } else {
+    delete user.roleExpiresAt;
+    delete user.originalRole;
+  }
+
   saveDB();
 
   logActivity(
     admin.id,
     admin.email,
     'CAMBIAR_ROL',
-    `Cambió el rol de ${user.email} de "${oldRole}" a "${role}"`,
+    `Cambió el rol de ${user.email} de "${oldRole}" a "${role}" (${durationMs ? 'temporal por ' + normDuration : 'Permanente'})`,
     req
   );
 
@@ -2042,9 +2214,321 @@ app.put('/api/admin/users/:id/role', authenticate, requireRole(UserRole.CoOwner)
       email: user.email,
       username: user.username,
       role: user.role,
-      isVerified: user.isVerified
+      isVerified: user.isVerified,
+      roleExpiresAt: user.roleExpiresAt,
+      originalRole: user.originalRole
     }
   });
+});
+
+// -------------------------------------------------------------
+// SISTEMA DE CÓDIGOS CANJEABLES ENDPOINTS
+// -------------------------------------------------------------
+
+// Get all promo codes and redemption history (Admin only)
+app.get('/api/admin/codes', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
+  db.promoCodes = db.promoCodes || [];
+  db.promoCodeRedeems = db.promoCodeRedeems || [];
+  res.json({
+    codes: db.promoCodes,
+    redeems: db.promoCodeRedeems
+  });
+});
+
+// Create a promo code (Admin only)
+app.post('/api/admin/codes', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
+  db.promoCodes = db.promoCodes || [];
+  const admin = (req as any).user as User;
+  let { code, role, duration, maxUses, expiresAt } = req.body;
+
+  if (!role || !Object.values(UserRole).includes(role)) {
+    res.status(400).json({ error: 'Rol a asignar es inválido.' });
+    return;
+  }
+
+  // Handle empty or auto-generated code
+  if (!code || !code.trim()) {
+    code = 'LUNATIC-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+  } else {
+    code = code.trim().toUpperCase();
+  }
+
+  // Check if code already exists
+  if (db.promoCodes.some(c => c.code === code)) {
+    res.status(400).json({ error: 'Este código de promoción ya existe.' });
+    return;
+  }
+
+  const newCode: PromoCode = {
+    id: crypto.randomUUID(),
+    code,
+    role: role as UserRole,
+    duration: duration || 'Permanente',
+    maxUses: maxUses ? Number(maxUses) : 1,
+    useCount: 0,
+    expiresAt: expiresAt || undefined,
+    isActive: true,
+    createdAt: new Date().toISOString()
+  };
+
+  db.promoCodes.unshift(newCode);
+  saveDB();
+
+  logActivity(
+    admin.id,
+    admin.email,
+    'CREAR_CODIGO_PROMO',
+    `Creado código canjeable: "${code}" para rol "${role}" (${duration})`,
+    req
+  );
+
+  res.status(201).json({ success: true, code: newCode });
+});
+
+// Redeem a promo code
+app.post('/api/codes/redeem', authenticate, (req, res) => {
+  db.promoCodes = db.promoCodes || [];
+  db.promoCodeRedeems = db.promoCodeRedeems || [];
+  const user = (req as any).user as User;
+  const ip = (req.ip || req.socket.remoteAddress || 'unknown').replace('::ffff:', '');
+  const { code: codeInput } = req.body;
+
+  if (!codeInput || !codeInput.trim()) {
+    res.status(400).json({ error: 'Por favor introduce un código.' });
+    return;
+  }
+
+  const targetCode = codeInput.trim().toUpperCase();
+  const codeRecord = db.promoCodes.find(c => c.code === targetCode);
+
+  if (!codeRecord) {
+    const redeemLog: PromoCodeRedeem = {
+      id: crypto.randomUUID(),
+      codeId: 'unknown',
+      code: targetCode,
+      userId: user.id,
+      username: user.username,
+      userEmail: user.email,
+      ip,
+      redeemedAt: new Date().toISOString(),
+      status: 'Fallido',
+      details: 'El código no existe.'
+    };
+    db.promoCodeRedeems.unshift(redeemLog);
+    saveDB();
+
+    res.status(404).json({ error: 'El código de canje no es válido o no existe.' });
+    return;
+  }
+
+  // Check if active
+  if (!codeRecord.isActive) {
+    const redeemLog: PromoCodeRedeem = {
+      id: crypto.randomUUID(),
+      codeId: codeRecord.id,
+      code: codeRecord.code,
+      userId: user.id,
+      username: user.username,
+      userEmail: user.email,
+      ip,
+      redeemedAt: new Date().toISOString(),
+      status: 'Fallido',
+      details: 'El código está pausado o inactivo.'
+    };
+    db.promoCodeRedeems.unshift(redeemLog);
+    saveDB();
+
+    res.status(400).json({ error: 'Este código de canje está inactivo o pausado.' });
+    return;
+  }
+
+  // Check usages
+  if (codeRecord.useCount >= codeRecord.maxUses) {
+    const redeemLog: PromoCodeRedeem = {
+      id: crypto.randomUUID(),
+      codeId: codeRecord.id,
+      code: codeRecord.code,
+      userId: user.id,
+      username: user.username,
+      userEmail: user.email,
+      ip,
+      redeemedAt: new Date().toISOString(),
+      status: 'Fallido',
+      details: 'Código agotado.'
+    };
+    db.promoCodeRedeems.unshift(redeemLog);
+    saveDB();
+
+    res.status(400).json({ error: 'Este código ya ha alcanzado el límite máximo de usos.' });
+    return;
+  }
+
+  // Check expiration
+  if (codeRecord.expiresAt && new Date() > new Date(codeRecord.expiresAt)) {
+    const redeemLog: PromoCodeRedeem = {
+      id: crypto.randomUUID(),
+      codeId: codeRecord.id,
+      code: codeRecord.code,
+      userId: user.id,
+      username: user.username,
+      userEmail: user.email,
+      ip,
+      redeemedAt: new Date().toISOString(),
+      status: 'Fallido',
+      details: 'Código expirado por fecha.'
+    };
+    db.promoCodeRedeems.unshift(redeemLog);
+    saveDB();
+
+    res.status(400).json({ error: 'Este código ya ha expirado por fecha.' });
+    return;
+  }
+
+  // Check if user has already redeemed THIS specific code
+  const alreadyRedeemed = db.promoCodeRedeems.some(r => r.codeId === codeRecord.id && r.userId === user.id && r.status === 'Exitoso');
+  if (alreadyRedeemed) {
+    const redeemLog: PromoCodeRedeem = {
+      id: crypto.randomUUID(),
+      codeId: codeRecord.id,
+      code: codeRecord.code,
+      userId: user.id,
+      username: user.username,
+      userEmail: user.email,
+      ip,
+      redeemedAt: new Date().toISOString(),
+      status: 'Fallido',
+      details: 'Usuario ya canjeó este código anteriormente.'
+    };
+    db.promoCodeRedeems.unshift(redeemLog);
+    saveDB();
+
+    res.status(400).json({ error: 'Ya has canjeado este código anteriormente.' });
+    return;
+  }
+
+  // Immutable protection
+  if (IMMUTABLE_OWNERS.includes(user.email.toLowerCase())) {
+    res.status(400).json({ error: 'Las cuentas fundadoras no pueden alterar su rol.' });
+    return;
+  }
+
+  // All checks passed! Apply reward
+  const oldRole = user.role;
+  const userRecord = db.users.find(u => u.id === user.id);
+  if (!userRecord) {
+    res.status(404).json({ error: 'Usuario de sesión no encontrado.' });
+    return;
+  }
+
+  userRecord.role = codeRecord.role;
+
+  const normDuration = normalizeDuration(codeRecord.duration);
+  const durationMs = getDurationMs(normDuration);
+
+  if (durationMs !== null) {
+    userRecord.roleExpiresAt = new Date(Date.now() + durationMs).toISOString();
+    if (!userRecord.originalRole) {
+      userRecord.originalRole = oldRole;
+    }
+  } else {
+    delete userRecord.roleExpiresAt;
+    delete userRecord.originalRole;
+  }
+
+  // Increment usage count
+  codeRecord.useCount++;
+
+  // Log successful redemption
+  const redeemLog: PromoCodeRedeem = {
+    id: crypto.randomUUID(),
+    codeId: codeRecord.id,
+    code: codeRecord.code,
+    userId: user.id,
+    username: user.username,
+    userEmail: user.email,
+    ip,
+    redeemedAt: new Date().toISOString(),
+    status: 'Exitoso',
+    details: `Rol "${codeRecord.role}" asignado correctamente (${codeRecord.duration}).`
+  };
+  db.promoCodeRedeems.unshift(redeemLog);
+
+  saveDB();
+
+  logActivity(
+    user.id,
+    user.email,
+    'CANJEAR_CODIGO_PROMO',
+    `Canjeó exitosamente el código "${codeRecord.code}" obteniendo el rol "${codeRecord.role}" por ${codeRecord.duration}`,
+    req
+  );
+
+  res.json({
+    success: true,
+    message: `¡Código canjeado con éxito! Ahora tienes el rol: ${codeRecord.role}`,
+    user: {
+      id: userRecord.id,
+      email: userRecord.email,
+      username: userRecord.username,
+      role: userRecord.role,
+      isVerified: userRecord.isVerified,
+      roleExpiresAt: userRecord.roleExpiresAt,
+      originalRole: userRecord.originalRole
+    }
+  });
+});
+
+// Toggle promo code active/paused state (Admin only)
+app.post('/api/admin/codes/:id/toggle', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
+  db.promoCodes = db.promoCodes || [];
+  const { id } = req.params;
+  const admin = (req as any).user as User;
+
+  const codeRecord = db.promoCodes.find(c => c.id === id);
+  if (!codeRecord) {
+    res.status(404).json({ error: 'Código de promoción no encontrado.' });
+    return;
+  }
+
+  codeRecord.isActive = !codeRecord.isActive;
+  saveDB();
+
+  logActivity(
+    admin.id,
+    admin.email,
+    'MODIFICAR_CODIGO_PROMO',
+    `${codeRecord.isActive ? 'Activó' : 'Pausó'} el código promocional: "${codeRecord.code}"`,
+    req
+  );
+
+  res.json({ success: true, code: codeRecord });
+});
+
+// Delete promo code (Admin only)
+app.delete('/api/admin/codes/:id', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
+  db.promoCodes = db.promoCodes || [];
+  const { id } = req.params;
+  const admin = (req as any).user as User;
+
+  const index = db.promoCodes.findIndex(c => c.id === id);
+  if (index === -1) {
+    res.status(404).json({ error: 'Código de promoción no encontrado.' });
+    return;
+  }
+
+  const codeStr = db.promoCodes[index].code;
+  db.promoCodes.splice(index, 1);
+  saveDB();
+
+  logActivity(
+    admin.id,
+    admin.email,
+    'ELIMINAR_CODIGO_PROMO',
+    `Eliminó el código promocional: "${codeStr}"`,
+    req
+  );
+
+  res.json({ success: true });
 });
 
 // Suspend/Unsuspend User
@@ -2534,6 +3018,197 @@ app.delete('/api/requests/:id', authenticate, requireRole(UserRole.CoOwner), (re
 });
 
 // -------------------------------------------------------------
+// SISTEMA DE APORTES (DONATIONS) ENDPOINTS
+// -------------------------------------------------------------
+
+// Submit a donation/contribution
+app.post('/api/donations', authenticate, (req, res) => {
+  db.donations = db.donations || [];
+  const user = (req as any).user as User;
+  const { title, description, category, imageUrl, downloadMethod, downloadUrl, fileName, fileData } = req.body;
+
+  if (!title || !description || !category || !downloadMethod) {
+    res.status(400).json({ error: 'Faltan campos obligatorios para enviar el aporte.' });
+    return;
+  }
+
+  let finalImageUrl = imageUrl || '';
+  let finalDownloadUrl = downloadUrl || '';
+
+  // Save donation image if uploaded as base64
+  if (imageUrl && imageUrl.startsWith('data:image/')) {
+    try {
+      const ext = imageUrl.substring(imageUrl.indexOf('/') + 1, imageUrl.indexOf(';'));
+      const filename = `donation_img_${Date.now()}.${ext}`;
+      const filePath = path.join(UPLOADS_DIR, filename);
+      const base64Data = imageUrl.replace(/^data:image\/\w+;base64,/, "");
+      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+      finalImageUrl = `/uploads/${filename}`;
+    } catch (err) {
+      console.error('Error saving donation image:', err);
+    }
+  }
+
+  // Direct file upload handling
+  if (downloadMethod === 'file' && fileData && fileName) {
+    try {
+      const cleanFileName = `donation_file_${Date.now()}_${path.basename(fileName).replace(/\s+/g, '_')}`;
+      const filePath = path.join(UPLOADS_DIR, cleanFileName);
+
+      const base64Data = fileData.replace(/^data:\w+\/\w+;base64,/, "");
+      fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+
+      finalDownloadUrl = `/uploads/${cleanFileName}`;
+    } catch (err) {
+      console.error('Error saving donation file:', err);
+      res.status(500).json({ error: 'Error al subir el archivo de tu aporte.' });
+      return;
+    }
+  }
+
+  const newDonation: Donation = {
+    id: crypto.randomUUID(),
+    userId: user.id,
+    userEmail: user.email,
+    username: user.username,
+    title,
+    description,
+    category: category as ResourceCategory,
+    imageUrl: finalImageUrl || undefined,
+    downloadMethod,
+    downloadUrl: finalDownloadUrl || undefined,
+    fileName: fileName || undefined,
+    status: 'Pendiente',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  db.donations.unshift(newDonation);
+  saveDB();
+
+  logActivity(
+    user.id,
+    user.email,
+    'ENVIAR_APORTE',
+    `Aporte enviado: "${title}" en la categoría "${category}"`,
+    req
+  );
+
+  res.status(201).json({ success: true, donation: newDonation });
+});
+
+// Retrieve donations (Admins see all, users see their own)
+app.get('/api/donations', authenticate, (req, res) => {
+  db.donations = db.donations || [];
+  const user = (req as any).user as User;
+
+  const userLevel = ROLE_HIERARCHY[user.role] || 1;
+  const adminLevel = ROLE_HIERARCHY[UserRole.CoOwner];
+
+  if (userLevel >= adminLevel) {
+    res.json({ donations: db.donations });
+  } else {
+    const filtered = db.donations.filter(d => d.userId === user.id);
+    res.json({ donations: filtered });
+  }
+});
+
+// Approve or Reject a donation (Admin only)
+app.put('/api/admin/donations/:id/status', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
+  db.donations = db.donations || [];
+  const admin = (req as any).user as User;
+  const { id } = req.params;
+  const { status, observation, minRole } = req.body;
+
+  if (!['Aprobada', 'Rechazada'].includes(status)) {
+    res.status(400).json({ error: 'Estado inválido. Debe ser Aprobada o Rechazada.' });
+    return;
+  }
+
+  const donation = db.donations.find(d => d.id === id);
+  if (!donation) {
+    res.status(404).json({ error: 'Aporte no encontrado.' });
+    return;
+  }
+
+  const oldStatus = donation.status;
+  donation.status = status;
+  donation.observation = observation || '';
+  donation.updatedAt = new Date().toISOString();
+
+  let createdResource: Resource | null = null;
+
+  if (status === 'Aprobada' && oldStatus !== 'Aprobada') {
+    // Create resource automatically!
+    db.resources = db.resources || [];
+    
+    const targetMinRole = minRole || UserRole.Usuario;
+
+    createdResource = {
+      id: crypto.randomUUID(),
+      name: donation.title,
+      description: donation.description,
+      category: donation.category,
+      imageUrl: donation.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&q=80',
+      minRole: targetMinRole as UserRole,
+      downloadMethod: donation.downloadMethod,
+      downloadUrl: donation.downloadUrl || '',
+      fileName: donation.fileName || '',
+      createdAt: new Date().toISOString()
+    };
+
+    db.resources.unshift(createdResource);
+
+    logActivity(
+      admin.id,
+      admin.email,
+      'APROBAR_APORTE_Y_PUBLICAR',
+      `Aporte de ${donation.username} aprobado y publicado como recurso: "${donation.title}" (Rol: ${targetMinRole})`,
+      req
+    );
+  } else if (status === 'Rechazada') {
+    logActivity(
+      admin.id,
+      admin.email,
+      'RECHAZAR_APORTE',
+      `Aporte de ${donation.username} rechazado: "${donation.title}". Motivo: ${observation || 'Ninguno'}`,
+      req
+    );
+  }
+
+  saveDB();
+
+  res.json({ success: true, donation, resource: createdResource });
+});
+
+// Delete donation record (Admin only)
+app.delete('/api/admin/donations/:id', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
+  db.donations = db.donations || [];
+  const admin = (req as any).user as User;
+  const { id } = req.params;
+
+  const index = db.donations.findIndex(d => d.id === id);
+  if (index === -1) {
+    res.status(404).json({ error: 'Aporte no encontrado.' });
+    return;
+  }
+
+  const title = db.donations[index].title;
+  db.donations.splice(index, 1);
+  saveDB();
+
+  logActivity(
+    admin.id,
+    admin.email,
+    'ELIMINAR_APORTE',
+    `Eliminó el aporte: "${title}"`,
+    req
+  );
+
+  res.json({ success: true });
+});
+
+// -------------------------------------------------------------
 // DOWNLOAD LOGS (ADMINS EXCLUSIVE)
 // -------------------------------------------------------------
 app.get('/api/admin/download-logs', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
@@ -2768,6 +3443,8 @@ async function startServer() {
     console.log(`[LUNATIC EXPRESS SERVER] Running on port ${PORT}`);
     // Start background interval to check for expired giveaways every 5 seconds
     setInterval(checkAndAutoDrawGiveaways, 5000);
+    // Start background interval to check for expired roles every 10 seconds
+    setInterval(checkAndEnforceRoleExpirations, 10000);
   });
 
   const { WebSocketServer } = await import('ws');
