@@ -25,7 +25,7 @@ import {
   type PromoCode,
   type PromoCodeRedeem,
   type Donation
-} from './src/types.js';
+} from './src/types';
 
 const app = express();
 const PORT = 3000;
