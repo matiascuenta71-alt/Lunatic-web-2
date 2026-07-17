@@ -1767,7 +1767,7 @@ export default function AdminPanel({
                       <td colSpan={4} className="text-center py-8 text-slate-500">No hay publicaciones de streaming cargadas.</td>
                     </tr>
                   ) : (
-                    filteredStreaming.map((s) => (
+                    paginatedStreaming.map((s) => (
                       <tr key={s.id} className="hover:bg-slate-950/30 transition">
                         <td className="px-6 py-4 flex items-center gap-3">
                           <img
@@ -1811,6 +1811,27 @@ export default function AdminPanel({
                 </tbody>
               </table>
             </div>
+            {filteredStreaming.length > streamingPerPage && (
+              <div className="flex justify-between items-center bg-slate-950/60 px-6 py-3 border-t border-slate-800/60">
+                <button
+                  type="button"
+                  disabled={streamingPage === 1}
+                  onClick={() => setStreamingPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                >
+                  Anterior
+                </button>
+                <span className="text-[10px] text-slate-500 font-mono">Página {streamingPage} de {Math.ceil(filteredStreaming.length / streamingPerPage)}</span>
+                <button
+                  type="button"
+                  disabled={streamingPage * streamingPerPage >= filteredStreaming.length}
+                  onClick={() => setStreamingPage(p => p + 1)}
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                >
+                  Siguiente
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
