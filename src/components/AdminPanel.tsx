@@ -365,11 +365,29 @@ export default function AdminPanel({
   const [userSearch, setUserSearch] = useState('');
   const [userPage, setUserPage] = useState(1);
   const [resourceSearch, setResourceSearch] = useState('');
+  const [resourcePage, setResourcePage] = useState(1);
   const [streamingSearch, setStreamingSearch] = useState('');
+  const [streamingPage, setStreamingPage] = useState(1);
+  const [logsPage, setLogsPage] = useState(1);
+  const [downloadsPage, setDownloadsPage] = useState(1);
+  const [codesPage, setCodesPage] = useState(1);
+  const [redeemsPage, setRedeemsPage] = useState(1);
 
   useEffect(() => {
     setUserPage(1);
   }, [userSearch]);
+
+  useEffect(() => {
+    setResourcePage(1);
+  }, [resourceSearch]);
+
+  useEffect(() => {
+    setStreamingPage(1);
+  }, [streamingSearch]);
+
+  useEffect(() => {
+    setDownloadsPage(1);
+  }, [dlSearch, dlCategory, dlStatus, dlSort]);
 
   // Resource Form states
   const [resourceFormOpen, setResourceFormOpen] = useState(false);
@@ -859,10 +877,28 @@ export default function AdminPanel({
     return r.name.toLowerCase().includes(s) || r.category.toLowerCase().includes(s) || r.description.toLowerCase().includes(s);
   });
 
+  const resourcesPerPage = 10;
+  const paginatedResources = filteredResources.slice((resourcePage - 1) * resourcesPerPage, resourcePage * resourcesPerPage);
+
   const filteredStreaming = streaming.filter(s => {
     const term = streamingSearch.toLowerCase();
     return s.platform.toLowerCase().includes(term) || (s.accountType || '').toLowerCase().includes(term) || s.description.toLowerCase().includes(term);
   });
+
+  const streamingPerPage = 10;
+  const paginatedStreaming = filteredStreaming.slice((streamingPage - 1) * streamingPerPage, streamingPage * streamingPerPage);
+
+  const logsPerPage = 15;
+  const paginatedLogs = logs.slice((logsPage - 1) * logsPerPage, logsPage * logsPerPage);
+
+  const downloadsPerPage = 15;
+  const paginatedDownloads = downloadLogs.slice((downloadsPage - 1) * downloadsPerPage, downloadsPage * downloadsPerPage);
+
+  const codesPerPage = 10;
+  const paginatedCodes = promoCodes.slice((codesPage - 1) * codesPerPage, codesPage * codesPerPage);
+
+  const redeemsPerPage = 10;
+  const paginatedRedeems = promoCodeRedeems.slice((redeemsPage - 1) * redeemsPerPage, redeemsPage * redeemsPerPage);
 
   return (
     <div id="admin-panel" className="space-y-8 max-w-6xl mx-auto text-xs relative">
@@ -1488,7 +1524,7 @@ export default function AdminPanel({
                       <td colSpan={5} className="text-center py-8 text-slate-500">No hay recursos cargados.</td>
                     </tr>
                   ) : (
-                    filteredResources.map((r) => (
+                    paginatedResources.map((r) => (
                       <tr key={r.id} className="hover:bg-slate-950/30 transition">
                         <td className="px-6 py-4 flex items-center gap-3">
                           <img
@@ -1538,6 +1574,27 @@ export default function AdminPanel({
                 </tbody>
               </table>
             </div>
+            {filteredResources.length > resourcesPerPage && (
+              <div className="flex justify-between items-center bg-slate-950/60 px-6 py-3 border-t border-slate-800/60">
+                <button
+                  type="button"
+                  disabled={resourcePage === 1}
+                  onClick={() => setResourcePage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                >
+                  Anterior
+                </button>
+                <span className="text-[10px] text-slate-500 font-mono">Página {resourcePage} de {Math.ceil(filteredResources.length / resourcesPerPage)}</span>
+                <button
+                  type="button"
+                  disabled={resourcePage * resourcesPerPage >= filteredResources.length}
+                  onClick={() => setResourcePage(p => p + 1)}
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                >
+                  Siguiente
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1765,11 +1822,11 @@ export default function AdminPanel({
             <h3 className="font-display font-semibold text-sm text-slate-200 uppercase tracking-wider flex items-center gap-2">
               <History className="h-4 w-4 text-indigo-400" /> Registro Completo de Auditoría y Seguridad
             </h3>
-            <span className="text-[10px] text-slate-500 font-mono">Últimas 500 acciones registradas</span>
+            <span className="text-[10px] text-slate-500 font-mono">Total {logs.length} acciones registradas</span>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-            <div className="max-h-[500px] overflow-y-auto">
+            <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-mono text-[10px] uppercase sticky top-0 z-10">
@@ -1786,7 +1843,7 @@ export default function AdminPanel({
                       <td colSpan={5} className="text-center py-8 text-slate-500">No hay registros de actividad disponibles.</td>
                     </tr>
                   ) : (
-                    logs.map((log) => (
+                    paginatedLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-slate-950/20 transition font-mono text-[11px]">
                         <td className="px-6 py-3 text-slate-500">
                           {new Date(log.createdAt).toLocaleString()}
@@ -1809,6 +1866,27 @@ export default function AdminPanel({
                 </tbody>
               </table>
             </div>
+            {logs.length > logsPerPage && (
+              <div className="flex justify-between items-center bg-slate-950/60 px-6 py-3 border-t border-slate-800/60">
+                <button
+                  type="button"
+                  disabled={logsPage === 1}
+                  onClick={() => setLogsPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                >
+                  Anterior
+                </button>
+                <span className="text-[10px] text-slate-500 font-mono">Página {logsPage} de {Math.ceil(logs.length / logsPerPage)}</span>
+                <button
+                  type="button"
+                  disabled={logsPage * logsPerPage >= logs.length}
+                  onClick={() => setLogsPage(p => p + 1)}
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                >
+                  Siguiente
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1910,7 +1988,7 @@ export default function AdminPanel({
 
           {/* Download Logs Table */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow">
-            <div className="max-h-[500px] overflow-y-auto">
+            <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-mono text-[10px] uppercase sticky top-0 z-10">
@@ -1936,7 +2014,7 @@ export default function AdminPanel({
                       </td>
                     </tr>
                   ) : (
-                    downloadLogs.map((log) => (
+                    paginatedDownloads.map((log) => (
                       <tr key={log.id} className="hover:bg-slate-950/20 transition text-[11px]">
                         <td className="px-6 py-3.5 font-mono text-slate-500">
                           {new Date(log.createdAt).toLocaleString()}
@@ -1972,6 +2050,27 @@ export default function AdminPanel({
                 </tbody>
               </table>
             </div>
+            {downloadLogs.length > downloadsPerPage && (
+              <div className="flex justify-between items-center bg-slate-950/60 px-6 py-3 border-t border-slate-800/60">
+                <button
+                  type="button"
+                  disabled={downloadsPage === 1}
+                  onClick={() => setDownloadsPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                >
+                  Anterior
+                </button>
+                <span className="text-[10px] text-slate-500 font-mono">Página {downloadsPage} de {Math.ceil(downloadLogs.length / downloadsPerPage)}</span>
+                <button
+                  type="button"
+                  disabled={downloadsPage * downloadsPerPage >= downloadLogs.length}
+                  onClick={() => setDownloadsPage(p => p + 1)}
+                  className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                >
+                  Siguiente
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2127,7 +2226,7 @@ export default function AdminPanel({
                           <td colSpan={6} className="text-center py-6 text-slate-500">No hay códigos creados todavía.</td>
                         </tr>
                       ) : (
-                        promoCodes.map((c) => {
+                        paginatedCodes.map((c) => {
                           const isExpired = c.expiresAt && new Date() > new Date(c.expiresAt);
                           const isLimitReached = c.currentUses >= c.maxUses;
                           return (
@@ -2157,6 +2256,7 @@ export default function AdminPanel({
                               </td>
                               <td className="px-5 py-3 text-right space-x-1.5">
                                 <button
+                                  type="button"
                                   onClick={() => handleToggleCode(c.id)}
                                   className={`px-2 py-1 rounded text-[10px] font-semibold transition cursor-pointer ${
                                     c.isActive 
@@ -2167,6 +2267,7 @@ export default function AdminPanel({
                                   {c.isActive ? 'Pausar' : 'Activar'}
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => handleDeleteCode(c.id)}
                                   className="p-1 hover:bg-red-500/10 text-slate-500 hover:text-red-400 rounded transition cursor-pointer"
                                 >
@@ -2180,6 +2281,27 @@ export default function AdminPanel({
                     </tbody>
                   </table>
                 </div>
+                {promoCodes.length > codesPerPage && (
+                  <div className="flex justify-between items-center bg-slate-950/60 px-5 py-3 border-t border-slate-800/60">
+                    <button
+                      type="button"
+                      disabled={codesPage === 1}
+                      onClick={() => setCodesPage(p => Math.max(1, p - 1))}
+                      className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-[10px] text-slate-500 font-mono">Página {codesPage} de {Math.ceil(promoCodes.length / codesPerPage)}</span>
+                    <button
+                      type="button"
+                      disabled={codesPage * codesPerPage >= promoCodes.length}
+                      onClick={() => setCodesPage(p => p + 1)}
+                      className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Redeem History */}
@@ -2187,7 +2309,7 @@ export default function AdminPanel({
                 <div className="px-5 py-4 border-b border-slate-800 bg-slate-900/50">
                   <h4 className="font-display font-bold text-slate-200 text-xs uppercase tracking-wider">Historial de Canjes ({promoCodeRedeems.length})</h4>
                 </div>
-                <div className="overflow-x-auto max-h-[250px] overflow-y-auto">
+                <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-slate-800 bg-slate-950/20 text-slate-500 font-mono text-[9px] uppercase tracking-wider sticky top-0 backdrop-blur">
@@ -2203,7 +2325,7 @@ export default function AdminPanel({
                           <td colSpan={4} className="text-center py-6 text-slate-500">Ningún código canjeado todavía.</td>
                         </tr>
                       ) : (
-                        promoCodeRedeems.map((r) => (
+                        paginatedRedeems.map((r) => (
                           <tr key={r.id} className="hover:bg-slate-950/10 transition">
                             <td className="px-5 py-2.5 text-slate-500 text-[10px]">
                               {new Date(r.redeemedAt).toLocaleString()}
@@ -2217,6 +2339,27 @@ export default function AdminPanel({
                     </tbody>
                   </table>
                 </div>
+                {promoCodeRedeems.length > redeemsPerPage && (
+                  <div className="flex justify-between items-center bg-slate-950/60 px-5 py-3 border-t border-slate-800/60">
+                    <button
+                      type="button"
+                      disabled={redeemsPage === 1}
+                      onClick={() => setRedeemsPage(p => Math.max(1, p - 1))}
+                      className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-[10px] text-slate-500 font-mono">Página {redeemsPage} de {Math.ceil(promoCodeRedeems.length / redeemsPerPage)}</span>
+                    <button
+                      type="button"
+                      disabled={redeemsPage * redeemsPerPage >= promoCodeRedeems.length}
+                      onClick={() => setRedeemsPage(p => p + 1)}
+                      className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white rounded-lg disabled:opacity-40 text-[10px] font-semibold transition cursor-pointer"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
