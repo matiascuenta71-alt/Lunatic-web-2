@@ -46,6 +46,143 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 // Ensure the uploaded files can be served
 app.use('/uploads', express.static(UPLOADS_DIR));
 
+// -------------------------------------------------------------
+// CYBERSECURITY UTILITIES AND MIDDLEWARES
+// -------------------------------------------------------------
+
+// Input sanitization to prevent Stored & Reflected XSS
+function sanitizeString(str: any): any {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // strip script tags
+    .replace(/on\w+\s*=/gi, '') // strip event handlers
+    .replace(/javascript:/gi, '') // strip javascript: protocol
+    .replace(/<[^>]*>/g, (tag) => tag.replace(/</g, '&lt;').replace(/>/g, '&gt;')); // escape general tags
+}
+
+function sanitizeObject(obj: any): any {
+  if (!obj) return obj;
+  if (typeof obj === 'string') {
+    return sanitizeString(obj);
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeObject(item));
+  }
+  if (typeof obj === 'object') {
+    const sanitized: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        // Skip binary file content fields to prevent corruption
+        if (key === 'fileData' || (key === 'imageUrl' && typeof obj[key] === 'string' && obj[key].startsWith('data:'))) {
+          sanitized[key] = obj[key];
+        } else {
+          sanitized[key] = sanitizeObject(obj[key]);
+        }
+      }
+    }
+    return sanitized;
+  }
+  return obj;
+}
+
+// Security Headers Middleware (OWASP Top 10 Alignments)
+app.use((req, res, next) => {
+  // Prevent MIME sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
+  // Strict CSP allowing Google AI Studio dynamic iframe context safely while enforcing strong boundaries
+  res.setHeader('Content-Security-Policy', 
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "img-src 'self' data: https://api.dicebear.com https://images.unsplash.com; " +
+    "connect-src 'self' ws: wss:; " +
+    "frame-ancestors 'self' https://*.run.app https://*.google.com https://*.google.dev https://*.aistudio.google;"
+  );
+
+  // HSTS (Strict Transport Security)
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+
+  // Referrer Policy
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  // Permissions Policy
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+  // Clickjacking Frame Protection
+  const referer = req.headers.referer || '';
+  if (referer.includes('.run.app') || referer.includes('.google.com') || referer.includes('.google.dev')) {
+    // Keep frame-ancestors for Google dynamic preview environment
+  } else {
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  }
+
+  next();
+});
+
+// Least-Privilege CORS Configuration
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '';
+  if (origin.endsWith('.run.app') || origin.endsWith('.google.com') || origin.endsWith('.google.dev') || origin === 'http://localhost:3000') {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', 'null');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
+// In-Memory Rate Limiting Engine
+interface RateLimitRecord {
+  count: number;
+  resetTime: number;
+}
+const rateLimits = new Map<string, RateLimitRecord>();
+
+function rateLimiter(limit: number, windowMs: number) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = req.ip || req.headers['x-forwarded-for'] as string || '127.0.0.1';
+    const now = Date.now();
+    const key = `${ip}:${req.path}`;
+
+    let record = rateLimits.get(key);
+    if (!record || now > record.resetTime) {
+      record = { count: 1, resetTime: now + windowMs };
+      rateLimits.set(key, record);
+      next();
+      return;
+    }
+
+    record.count++;
+    if (record.count > limit) {
+      res.status(429).json({ error: 'Demasiadas solicitudes. Por favor, intente de nuevo en unos minutos.' });
+      return;
+    }
+
+    next();
+  };
+}
+
+// Global sanitization middleware for body parameters
+app.use('/api', (req, res, next) => {
+  if (req.body) {
+    req.body = sanitizeObject(req.body);
+  }
+  next();
+});
+
+// API-wide anti-DoS rate limiting
+app.use('/api', rateLimiter(250, 60000)); // 250 requests per minute max per IP
+
+
 // Initialize Database structure
 interface DBStructure {
   users: (User & { passwordHash: string })[];
@@ -329,12 +466,58 @@ function checkAndEnforceRoleExpirations() {
 // Middleware: Authenticate User
 function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
   checkAndEnforceRoleExpirations();
+  let token = '';
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'No autorizado. Se requiere token.' });
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.headers.cookie) {
+    const cookies = req.headers.cookie.split(';').reduce((acc, c) => {
+      const parts = c.trim().split('=');
+      const k = parts[0];
+      const v = parts.slice(1).join('=');
+      acc[k] = v;
+      return acc;
+    }, {} as Record<string, string>);
+    token = cookies['lunatic_token'] || '';
+  }
+
+  if (!token) {
+    res.status(401).json({ error: 'No autorizado. Se requiere token o cookie de sesión.' });
     return;
   }
-  const token = authHeader.split(' ')[1];
+
+  const parsed = verifySignedToken(token);
+  if (!parsed) {
+    res.status(401).json({ error: 'Sesión inválida o firma corrupta.' });
+    return;
+  }
+
+  // Cryptographic Binding & Fingerprinting Validation
+  const reqIp = req.ip || (req.headers['x-forwarded-for'] as string) || '127.0.0.1';
+  const reqUserAgent = req.headers['user-agent'] || '';
+
+  // 1. Strict User-Agent Match
+  if (parsed.userAgent && parsed.userAgent !== reqUserAgent) {
+    logActivity(parsed.id || 'ANÓNIMO', parsed.email || 'unknown', 'SEGURIDAD', `Intento de secuestro de sesión detectado. Navegador no coincide.`, req);
+    res.clearCookie('lunatic_token', { httpOnly: true, secure: true, sameSite: 'none' });
+    if (db.sessions[token]) delete db.sessions[token];
+    res.status(401).json({ error: 'Sesión inválida. Dispositivo no coincide.' });
+    return;
+  }
+
+  // 2. IP Validation Warning (allows dynamic cellular shifting but flags major anomalies)
+  if (parsed.ip && parsed.ip !== '127.0.0.1' && reqIp !== '127.0.0.1') {
+    const parsedIpParts = parsed.ip.split('.');
+    const reqIpParts = reqIp.split('.');
+    const isIPv4Match = parsedIpParts.length === 4 && reqIpParts.length === 4 && 
+                        parsedIpParts[0] === reqIpParts[0] && 
+                        parsedIpParts[1] === reqIpParts[1];
+    
+    if (parsedIpParts.length === 4 && reqIpParts.length === 4 && !isIPv4Match) {
+       logActivity(parsed.id, parsed.email, 'SEGURIDAD_ADVERTENCIA', `Cambio de red IP para la sesión: de ${parsed.ip} a ${reqIp}`, req);
+    }
+  }
+
   let userId = db.sessions[token];
   let user = userId ? db.users.find(u => u.id === userId) : null;
 
@@ -506,15 +689,47 @@ function sendEmailSimulation(to: string, subject: string, title: string, content
 // -------------------------------------------------------------
 
 // REGISTER
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', rateLimiter(15, 60000), (req, res) => {
   const { email, username, password } = req.body;
   if (!email || !username || !password) {
     res.status(400).json({ error: 'Todos los campos son obligatorios.' });
     return;
   }
 
+  if (typeof email !== 'string' || typeof username !== 'string' || typeof password !== 'string') {
+    res.status(400).json({ error: 'Campos de entrada no válidos.' });
+    return;
+  }
+
   const normalizedEmail = email.toLowerCase().trim();
-  const existingUser = db.users.find(u => u.email.toLowerCase() === normalizedEmail || u.username.toLowerCase() === username.toLowerCase().trim());
+  const trimmedUsername = username.trim();
+
+  // Validate Email Structure
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalizedEmail)) {
+    res.status(400).json({ error: 'El formato de correo electrónico no es válido.' });
+    return;
+  }
+
+  // Validate Username format and length
+  if (trimmedUsername.length < 3 || trimmedUsername.length > 30) {
+    res.status(400).json({ error: 'El nombre de usuario debe tener entre 3 y 30 caracteres.' });
+    return;
+  }
+
+  const usernameRegex = /^[a-zA-Z0-9_\-]+$/;
+  if (!usernameRegex.test(trimmedUsername)) {
+    res.status(400).json({ error: 'El nombre de usuario solo puede contener letras, números, guiones y guiones bajos.' });
+    return;
+  }
+
+  // Validate Password complexity (minimum 8 characters)
+  if (password.length < 8) {
+    res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres para asegurar la cuenta.' });
+    return;
+  }
+
+  const existingUser = db.users.find(u => u.email.toLowerCase() === normalizedEmail || u.username.toLowerCase() === trimmedUsername.toLowerCase());
   if (existingUser) {
     res.status(400).json({ error: 'El correo electrónico o nombre de usuario ya está registrado.' });
     return;
@@ -527,19 +742,19 @@ app.post('/api/auth/register', (req, res) => {
   const newUser: User = {
     id: crypto.randomUUID(),
     email: normalizedEmail,
-    username: username.trim(),
+    username: trimmedUsername,
     role: userRole,
     isVerified,
     createdAt: new Date().toISOString(),
     isSuspended: false,
-    avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(username)}`,
+    avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(trimmedUsername)}`,
     profileBackground: 'bg-slate-900'
   };
 
   const passwordHash = hashPassword(password);
   db.users.push({ ...newUser, passwordHash });
 
-  // Generate a self-healing active Session Token immediately containing full user metadata
+  // Generate a self-healing active Session Token immediately containing full user metadata and browser fingerprint
   const tokenPayload = {
     id: newUser.id,
     email: newUser.email,
@@ -550,7 +765,9 @@ app.post('/api/auth/register', (req, res) => {
     avatarUrl: newUser.avatarUrl,
     profileBackground: newUser.profileBackground,
     isSuspended: newUser.isSuspended,
-    passwordHash: passwordHash
+    passwordHash: passwordHash,
+    ip: req.ip || (req.headers['x-forwarded-for'] as string) || '127.0.0.1',
+    userAgent: req.headers['user-agent'] || ''
   };
   const token = createSignedToken(tokenPayload);
   db.sessions[token] = newUser.id;
@@ -558,6 +775,13 @@ app.post('/api/auth/register', (req, res) => {
   saveDB();
 
   logActivity(newUser.id, newUser.email, 'REGISTRO', `Usuario registrado y verificado automáticamente como ${userRole}`, req);
+
+  res.cookie('lunatic_token', token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+  });
 
   res.status(201).json({
     message: 'Registro completado exitosamente.',
@@ -567,7 +791,7 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 // VERIFY EMAIL
-app.post('/api/auth/verify-email', (req, res) => {
+app.post('/api/auth/verify-email', rateLimiter(15, 60000), (req, res) => {
   const { email, code } = req.body;
   if (!email || !code) {
     res.status(400).json({ error: 'Correo y código son requeridos.' });
@@ -611,7 +835,7 @@ app.post('/api/auth/verify-email', (req, res) => {
 });
 
 // RESEND CODE
-app.post('/api/auth/resend-code', (req, res) => {
+app.post('/api/auth/resend-code', rateLimiter(15, 60000), (req, res) => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ error: 'Correo requerido.' });
@@ -656,7 +880,7 @@ app.post('/api/auth/resend-code', (req, res) => {
 });
 
 // LOGIN
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', rateLimiter(15, 60000), (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: 'Correo y contraseña son requeridos.' });
@@ -696,7 +920,7 @@ app.post('/api/auth/login', (req, res) => {
     }
   }
 
-  // Generate a self-healing active Session Token containing full user metadata
+  // Generate a self-healing active Session Token containing full user metadata and browser fingerprint
   const tokenPayload = {
     id: userRecord.id,
     email: userRecord.email,
@@ -707,7 +931,9 @@ app.post('/api/auth/login', (req, res) => {
     avatarUrl: userRecord.avatarUrl,
     profileBackground: userRecord.profileBackground,
     isSuspended: userRecord.isSuspended,
-    passwordHash: userRecord.passwordHash
+    passwordHash: userRecord.passwordHash,
+    ip: req.ip || (req.headers['x-forwarded-for'] as string) || '127.0.0.1',
+    userAgent: req.headers['user-agent'] || ''
   };
   const token = createSignedToken(tokenPayload);
   db.sessions[token] = userRecord.id;
@@ -728,6 +954,13 @@ app.post('/api/auth/login', (req, res) => {
 
   logActivity(userRecord.id, userRecord.email, 'LOGIN', 'Inicio de sesión exitoso', req);
 
+  res.cookie('lunatic_token', token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+  });
+
   res.json({
     token,
     user: cleanUser
@@ -736,9 +969,28 @@ app.post('/api/auth/login', (req, res) => {
 
 // LOGOUT
 app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('lunatic_token', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none'
+  });
+
   const authHeader = req.headers.authorization;
+  let token = '';
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
+    token = authHeader.split(' ')[1];
+  } else if (req.headers.cookie) {
+    const cookies = req.headers.cookie.split(';').reduce((acc, c) => {
+      const parts = c.trim().split('=');
+      const k = parts[0];
+      const v = parts.slice(1).join('=');
+      acc[k] = v;
+      return acc;
+    }, {} as Record<string, string>);
+    token = cookies['lunatic_token'] || '';
+  }
+
+  if (token) {
     const userId = db.sessions[token];
     if (userId) {
       const user = db.users.find(u => u.id === userId);
@@ -3485,7 +3737,7 @@ async function startServer() {
     }
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     const clientRecord: ActiveClient = { ws };
     activeClients.add(clientRecord);
 
@@ -3494,12 +3746,26 @@ async function startServer() {
         const payload = JSON.parse(messageBuffer.toString('utf-8'));
         if (payload.type === 'auth') {
           const token = payload.token;
+          const parsed = verifySignedToken(token);
+          if (!parsed) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Token de autenticación inválido o firma corrupta.' }));
+            ws.close();
+            return;
+          }
+
+          // Validate fingerprint binding for WebSocket connection
+          const wsUserAgent = req ? req.headers['user-agent'] || '' : '';
+          if (parsed.userAgent && parsed.userAgent !== wsUserAgent) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Firma de dispositivo/navegador no coincide.' }));
+            ws.close();
+            return;
+          }
+
           let userId = db.sessions[token];
           let user = userId ? db.users.find(u => u.id === userId) : null;
 
           // Self-healing check
           if ((!userId || !user) && token) {
-            const parsed = verifySignedToken(token);
             if (parsed && parsed.id && parsed.email) {
               let existingUser = db.users.find(u => u.id === parsed.id || u.email.toLowerCase() === parsed.email.toLowerCase());
               if (!existingUser) {

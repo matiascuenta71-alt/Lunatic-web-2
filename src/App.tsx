@@ -373,7 +373,7 @@ const TabRenderer = React.memo(({
 
 export default function App() {
   // Auth state
-  const [token, setToken] = useState<string | null>(localStorage.getItem('lunatic_token'));
+  const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -413,24 +413,22 @@ export default function App() {
     }
   };
 
-  // Check active user session on load/re-render
-  const checkSession = async (savedToken: string) => {
+  // Check active user session on load/re-render via secure HttpOnly cookie
+  const checkSession = async () => {
     try {
-      const res = await fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${savedToken}` }
-      });
+      const res = await fetch('/api/auth/me');
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && data.user) {
         setUser(data.user);
-        setToken(savedToken);
+        setToken(data.token || null);
       } else {
-        // Clear stale session
-        localStorage.removeItem('lunatic_token');
         setToken(null);
         setUser(null);
       }
     } catch (err) {
       console.error('Session validation failed:', err);
+      setToken(null);
+      setUser(null);
     } finally {
       setAuthLoading(false);
     }
@@ -492,12 +490,8 @@ export default function App() {
 
   useEffect(() => {
     fetchPublicStats();
-    if (token) {
-      checkSession(token);
-    } else {
-      setAuthLoading(false);
-    }
-  }, [token]);
+    checkSession();
+  }, []);
 
   useEffect(() => {
     if (user && token) {
@@ -506,24 +500,19 @@ export default function App() {
   }, [user, token, activeTab]);
 
   const handleLoginSuccess = (newToken: string, loggedInUser: any) => {
-    localStorage.setItem('lunatic_token', newToken);
     setToken(newToken);
     setUser(loggedInUser);
     setActiveTab('home');
   };
 
   const handleLogout = async () => {
-    if (token) {
-      try {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-      } catch (err) {
-        console.error('Logout error:', err);
-      }
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST'
+      });
+    } catch (err) {
+      console.error('Logout error:', err);
     }
-    localStorage.removeItem('lunatic_token');
     setToken(null);
     setUser(null);
     setActiveTab('home');

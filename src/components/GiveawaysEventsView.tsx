@@ -135,7 +135,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
     setLoading(true);
     setError(null);
     try {
-      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const token = propToken || '';
       
       // Fetch giveaways
       const giveawayRes = await fetch('/api/giveaways', {
@@ -178,7 +178,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
     }
 
     try {
-      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const token = propToken || '';
       const res = await fetch('/api/admin/giveaways', {
         method: 'POST',
         headers: {
@@ -232,7 +232,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
     }
 
     try {
-      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const token = propToken || '';
       const res = await fetch('/api/admin/events', {
         method: 'POST',
         headers: {
@@ -268,7 +268,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
     setError(null);
     setSuccess(null);
     try {
-      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const token = propToken || '';
       const res = await fetch(`/api/giveaways/${giveawayId}/enter`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
@@ -289,7 +289,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
     setError(null);
     setSuccess(null);
     try {
-      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const token = propToken || '';
       const res = await fetch(`/api/admin/giveaways/${giveawayId}/draw`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
@@ -310,7 +310,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
     setError(null);
     setSuccess(null);
     try {
-      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const token = propToken || '';
       const res = await fetch(`/api/admin/giveaways/${giveawayId}/redraw`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
@@ -329,7 +329,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
   const handleDeleteGiveaway = async (giveawayId: string) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar este sorteo? Esta acción es irreversible.')) return;
     try {
-      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const token = propToken || '';
       const res = await fetch(`/api/admin/giveaways/${giveawayId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
@@ -348,7 +348,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
 
   const handleEventRsvp = async (eventId: string, rsvpStatus: 'going' | 'maybe' | 'not_going') => {
     try {
-      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const token = propToken || '';
       const res = await fetch(`/api/events/${eventId}/rsvp`, {
         method: 'POST',
         headers: {
@@ -371,7 +371,7 @@ export default function GiveawaysEventsView({ user, token: propToken }: Giveaway
   const handleDeleteEvent = async (eventId: string) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar este evento?')) return;
     try {
-      const token = propToken || localStorage.getItem('lunatic_token') || localStorage.getItem('token');
+      const token = propToken || '';
       const res = await fetch(`/api/admin/events/${eventId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
