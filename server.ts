@@ -28,7 +28,7 @@ import {
 } from './src/types';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Enable JSON body parsing with large limit for file uploads
 app.use(express.json({ limit: '50mb' }));
@@ -2403,6 +2403,32 @@ app.post('/api/codes/redeem', authenticate, (req, res) => {
     saveDB();
 
     res.status(400).json({ error: 'Ya has canjeado este código anteriormente.' });
+    return;
+  }
+
+  // Check if the user already has equal or higher privileges
+  const userLevel = ROLE_HIERARCHY[user.role] || 1;
+  const targetLevel = ROLE_HIERARCHY[codeRecord.role] || 1;
+
+  if (userLevel >= targetLevel) {
+    const redeemLog: PromoCodeRedeem = {
+      id: crypto.randomUUID(),
+      codeId: codeRecord.id,
+      code: codeRecord.code,
+      userId: user.id,
+      username: user.username,
+      userEmail: user.email,
+      ip,
+      redeemedAt: new Date().toISOString(),
+      status: 'Fallido',
+      details: `Intento de canjear rol "${codeRecord.role}" pero ya tiene el rol "${user.role}" (igual o superior).`
+    };
+    db.promoCodeRedeems.unshift(redeemLog);
+    saveDB();
+
+    res.status(400).json({ 
+      error: `No puedes reclamar este código porque ya tienes el rol "${user.role}" (el cual es igual o superior al rol "${codeRecord.role}" que ofrece este código).` 
+    });
     return;
   }
 
