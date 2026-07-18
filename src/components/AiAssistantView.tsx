@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Sparkles, AlertCircle, Trash2, User, Loader2, RefreshCw } from 'lucide-react';
-import Markdown from 'react-markdown';
 import { type AiChatMessage } from '../types';
 import lunaticMascot from '../assets/images/lunatic_minecraft_mascot_1784341439473.jpg';
 
@@ -275,32 +274,8 @@ export default function AiAssistantView({ currentUser, token }: AiAssistantViewP
                       {isUser ? (
                         <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words font-medium">{msg.content}</p>
                       ) : (
-                        <div className="text-xs sm:text-sm leading-relaxed space-y-2.5 break-words">
-                          <Markdown
-                            components={{
-                              p: ({ node, ...props }) => <p className="mb-2 last:mb-0 text-slate-300/90 leading-relaxed" {...props} />,
-                              a: ({ node, ...props }) => <a className="text-cyan-400 hover:text-cyan-300 hover:underline font-bold transition" target="_blank" rel="noreferrer" {...props} />,
-                              ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-2 space-y-1 text-slate-300/90" {...props} />,
-                              ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-slate-300/90" {...props} />,
-                              li: ({ node, ...props }) => <li className="pl-1 text-slate-300/95" {...props} />,
-                              code: (props: any) => {
-                                const { node, inline, ...rest } = props;
-                                return inline ? (
-                                  <code className="bg-slate-900/80 text-rose-400 px-1.5 py-0.5 rounded font-mono text-xs border border-slate-800/40" {...rest} />
-                                ) : (
-                                  <pre className="bg-slate-950 p-4 rounded-2xl overflow-x-auto my-3 border border-slate-800/80 shadow-inner">
-                                    <code className="text-emerald-400 font-mono text-xs block leading-normal" {...rest} />
-                                  </pre>
-                                );
-                              },
-                              strong: ({ node, ...props }) => <strong className="font-extrabold text-indigo-300" {...props} />,
-                              h1: ({ node, ...props }) => <h1 className="text-sm font-black text-slate-100 mt-4 mb-2 border-b border-slate-800 pb-1 uppercase tracking-wider" {...props} />,
-                              h2: ({ node, ...props }) => <h2 className="text-xs font-bold text-slate-100 mt-3 mb-1.5" {...props} />,
-                              h3: ({ node, ...props }) => <h3 className="text-[11px] font-bold text-slate-200 mt-2 mb-1" {...props} />,
-                            }}
-                          >
-                            {msg.content}
-                          </Markdown>
+                        <div className="text-xs sm:text-sm leading-relaxed space-y-2.5 break-words whitespace-pre-wrap">
+                          {msg.content}
                         </div>
                       )}
                       <span className="block text-[8px] font-mono text-slate-500 mt-2 text-right">
