@@ -29,11 +29,10 @@ import {
   Star,
   MessageCircle,
   Upload,
-  Bot,
-  CheckCheck
+  Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { UserRole, ResourceCategory, ROLE_HIERARCHY, type AppNotification } from './types.js';
+import { UserRole, ResourceCategory, ROLE_HIERARCHY } from './types.js';
 
 // Import our modular custom components
 import AuthScreens from './components/AuthScreens.tsx';
@@ -100,40 +99,6 @@ const TabRenderer = React.memo(({
   isStaff,
   setIsAddStreamingOpen
 }: TabRendererProps) => {
-  const [redeemingLunatic, setRedeemingLunatic] = useState(false);
-  const [lunaticMsg, setLunaticMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const redeemLunaticCode = async () => {
-    if (!token) return;
-    setRedeemingLunatic(true);
-    setLunaticMsg(null);
-    try {
-      const res = await fetch('/api/codes/redeem', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ code: 'LUNATIC25' })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'No se pudo canjear el código.');
-      }
-      setLunaticMsg({ type: 'success', text: data.message || '¡Código canjeado con éxito!' });
-      handleProfileUpdated(data.user);
-      fetchPlatformData();
-    } catch (err: any) {
-      setLunaticMsg({ type: 'error', text: err.message || 'Ocurrió un error al canjear.' });
-    } finally {
-      setRedeemingLunatic(false);
-    }
-  };
-
-  const userLevel = ROLE_HIERARCHY[user?.role as UserRole] || 1;
-  const vipLevel = ROLE_HIERARCHY[UserRole.VIP] || 2;
-  const alreadyHasVipOrBetter = userLevel >= vipLevel;
-
   switch (tabKey) {
     case 'home':
       return (
@@ -150,6 +115,10 @@ const TabRenderer = React.memo(({
               <p className="text-zinc-400 text-xs max-w-lg leading-relaxed">
                 Un centro de recursos premium privado para plugins, modelos, setups y cuentas gratuitas. Tu rango de acceso es <strong className="text-indigo-300 font-semibold">{user?.role}</strong>.
               </p>
+              <div className="mt-4 p-4 rounded-lg bg-indigo-950/30 border border-indigo-500/20">
+                <p className="text-indigo-200 text-xs font-semibold">🎟️ ¡Código especial: LUNATIC26!</p>
+                <p className="text-zinc-400 text-[11px] mt-1">Canjéalo en tu perfil y obtén 3 días de rango VIP totalmente gratis. ¡Uso único por persona!</p>
+              </div>
               <button
                 onClick={() => setActiveTab('resources')}
                 className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-5 rounded-xl text-xs transition mt-2 shadow shadow-indigo-600/10 cursor-pointer"
@@ -168,72 +137,6 @@ const TabRenderer = React.memo(({
                 <span className="block text-2xl font-bold font-display text-indigo-400">{publicStats.resourceCount || 0}</span>
                 <span className="text-[10px] uppercase font-mono text-zinc-500 font-medium">Recursos</span>
               </div>
-            </div>
-          </div>
-
-          {/* Promo Code LUNATIC25 Card */}
-          <div className="rounded-2xl p-6 bg-gradient-to-r from-indigo-950/40 via-slate-900/40 to-[#09090b] border border-indigo-500/20 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group">
-            {/* Background glowing decorations */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
-            
-            <div className="flex items-start gap-4 z-10 flex-col sm:flex-row text-center sm:text-left">
-              <div className="p-3.5 bg-indigo-500/10 rounded-xl border border-indigo-500/20 text-indigo-400 shrink-0 mx-auto sm:mx-0">
-                <Gift className="h-6 w-6 text-indigo-400" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h4 className="font-display font-extrabold text-[#f4f4f5] text-base">🎁 Código Promocional VIP Gratis</h4>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                    ¡Activo Siempre!
-                  </span>
-                </div>
-                <p className="text-zinc-400 text-xs max-w-xl leading-relaxed">
-                  Usa el código promocional de sistema <strong className="text-indigo-400 font-mono font-bold select-all bg-indigo-950/40 px-1.5 py-0.5 rounded border border-indigo-500/25">LUNATIC25</strong> para activar instantáneamente <strong className="text-white font-semibold">3 días de rango VIP</strong>. Accede a recursos de descarga restringidos y cuentas de streaming exclusivas.
-                </p>
-                <div className="text-[10px] text-zinc-500">
-                  ⚠️ Límite: <strong className="text-zinc-400">1 solo uso por persona</strong>. Si ya lo canjeaste anteriormente, no podrás volver a activarlo.
-                </div>
-              </div>
-            </div>
-
-            <div className="shrink-0 w-full md:w-auto z-10 flex flex-col gap-2 items-center">
-              {alreadyHasVipOrBetter ? (
-                <div className="w-full text-center md:text-right">
-                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <Crown className="h-3.5 w-3.5" /> Ya tienes rango VIP o superior
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <button
-                    disabled={redeemingLunatic}
-                    onClick={redeemLunaticCode}
-                    className="w-full md:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition shadow-lg shadow-indigo-600/10 cursor-pointer"
-                  >
-                    {redeemingLunatic ? (
-                      <>
-                        <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Canjeando...
-                      </>
-                    ) : (
-                      <>
-                        Canjear 3 Días VIP Gratis
-                        <ArrowRight className="h-4 w-4" />
-                      </>
-                    )}
-                  </button>
-                </>
-              )}
-              
-              {lunaticMsg && (
-                <div className={`mt-2 p-2 px-3 rounded-lg border text-[11px] font-medium text-center w-full ${
-                  lunaticMsg.type === 'success' 
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                    : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                }`}>
-                  {lunaticMsg.text}
-                </div>
-              )}
             </div>
           </div>
 
@@ -475,22 +378,6 @@ const TabRenderer = React.memo(({
       return null;
   }
 });
-
-const getTargetTabForNotification = (type: string): TabType => {
-  switch (type) {
-    case 'announcement': return 'announcements';
-    case 'poll': return 'polls';
-    case 'giveaway': return 'events';
-    case 'resource':
-    case 'comment':
-      return 'resources';
-    case 'streaming': return 'streaming';
-    case 'review': return 'reviews';
-    case 'donation': return 'donations';
-    case 'request': return 'requests';
-    default: return 'home';
-  }
-};
 
 export default function App() {
   // Auth state
@@ -768,7 +655,7 @@ export default function App() {
               <span>📌</span> INFORMACIÓN
             </span>
             <button
-              onClick={() => handleTabChange('home')}
+              onClick={() => { setActiveTab('home'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'home' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
@@ -777,24 +664,22 @@ export default function App() {
               <span>🏠・Inicio</span>
             </button>
             <button
-              onClick={() => handleTabChange('announcements')}
+              onClick={() => { setActiveTab('announcements'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'announcements' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
             >
               <Megaphone className="h-4 w-4" />
               <span>📢・Anuncios</span>
-
             </button>
             <button
-              onClick={() => handleTabChange('polls')}
+              onClick={() => { setActiveTab('polls'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'polls' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
             >
               <Vote className="h-4 w-4" />
               <span>🗳️・Votaciones</span>
-
             </button>
           </div>
 
@@ -804,37 +689,34 @@ export default function App() {
               <span>📦</span> RECURSOS
             </span>
             <button
-              onClick={() => handleTabChange('resources')}
+              onClick={() => { setActiveTab('resources'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'resources' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
             >
               <FileCode className="h-4 w-4" />
               <span>💎・Recursos Premium</span>
-
             </button>
             <button
-              onClick={() => handleTabChange('requests')}
+              onClick={() => { setActiveTab('requests'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'requests' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
             >
               <ClipboardList className="h-4 w-4 text-emerald-400" />
               <span>📝・Solicitar Recursos</span>
-
             </button>
             <button
-              onClick={() => handleTabChange('donations')}
+              onClick={() => { setActiveTab('donations'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'donations' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
             >
               <Upload className="h-4 w-4 text-cyan-400" />
               <span>📥・Donar Recursos</span>
-
             </button>
             <button
-              onClick={() => handleTabChange('vip')}
+              onClick={() => { setActiveTab('vip'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'vip' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
@@ -850,7 +732,7 @@ export default function App() {
               <span>💬</span> COMUNIDAD
             </span>
             <button
-              onClick={() => handleTabChange('chat')}
+              onClick={() => { setActiveTab('chat'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'chat' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
@@ -859,7 +741,7 @@ export default function App() {
               <span>🌍・Chat Global</span>
             </button>
             <button
-              onClick={() => handleTabChange('ai_assistant')}
+              onClick={() => { setActiveTab('ai_assistant'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'ai_assistant' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
@@ -868,24 +750,22 @@ export default function App() {
               <span>🤖・Asistente IA</span>
             </button>
             <button
-              onClick={() => handleTabChange('reviews')}
+              onClick={() => { setActiveTab('reviews'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'reviews' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
             >
               <MessageCircle className="h-4 w-4 text-teal-400" />
               <span>💭・Canal de Reseñas</span>
-
             </button>
             <button
-              onClick={() => handleTabChange('events')}
+              onClick={() => { setActiveTab('events'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'events' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
             >
               <Gift className="h-4 w-4 text-purple-400" />
               <span>🎉・Sorteos & Eventos</span>
-
             </button>
           </div>
 
@@ -895,14 +775,13 @@ export default function App() {
               <span>🎬</span> ENTRETENIMIENTO
             </span>
             <button
-              onClick={() => handleTabChange('streaming')}
+              onClick={() => { setActiveTab('streaming'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'streaming' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
             >
               <Tv className="h-4 w-4 text-cyan-400" />
               <span>📺・Streaming Gratis</span>
-
             </button>
           </div>
 
@@ -912,7 +791,7 @@ export default function App() {
               <span>🤝</span> PATROCINADORES
             </span>
             <button
-              onClick={() => handleTabChange('sponsor')}
+              onClick={() => { setActiveTab('sponsor'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center justify-start gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition border ${
                 activeTab === 'sponsor' 
                   ? 'bg-red-950/30 border-red-500/40 text-red-400 shadow-lg shadow-red-500/5' 
@@ -930,7 +809,7 @@ export default function App() {
               <span>👤</span> CUENTA
             </span>
             <button
-              onClick={() => handleTabChange('profile')}
+              onClick={() => { setActiveTab('profile'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                 activeTab === 'profile' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
               }`}
@@ -954,7 +833,7 @@ export default function App() {
                 <span>🛡️</span> ADMINISTRACIÓN
               </span>
               <button
-                onClick={() => handleTabChange('admin')}
+                onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                   activeTab === 'admin' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
                 }`}
@@ -963,7 +842,7 @@ export default function App() {
                 <span>Panel Administrativo</span>
               </button>
               <button
-                onClick={() => handleTabChange('logs')}
+                onClick={() => { setActiveTab('logs'); setMobileMenuOpen(false); }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold tracking-wide transition ${
                   activeTab === 'logs' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
                 }`}
@@ -1033,27 +912,21 @@ export default function App() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-            {/* Quick search input (Enabled for resources & streaming tabs) */}
-            {(activeTab === 'resources' || activeTab === 'streaming') && (
-              <div className="relative w-full sm:w-64">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                  <Search className="h-4 w-4" />
-                </span>
-                <input
-                  type="text"
-                  value={globalSearch}
-                  onChange={(e) => setGlobalSearch(e.target.value)}
-                  placeholder="Buscador global..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-            )}
-
-
-
-
-          </div>
+          {/* Quick search input (Enabled for resources & streaming tabs) */}
+          {(activeTab === 'resources' || activeTab === 'streaming') && (
+            <div className="relative w-full sm:w-64">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                <Search className="h-4 w-4" />
+              </span>
+              <input
+                type="text"
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                placeholder="Buscador global..."
+                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          )}
         </div>
 
         {/* COMPONENT SWITCHER PANEL */}

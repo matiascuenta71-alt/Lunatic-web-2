@@ -26,8 +26,7 @@ import {
   type PromoCode,
   type PromoCodeRedeem,
   type Donation,
-  type AiChatMessage,
-  type AppNotification
+  type AiChatMessage
 } from './src/types';
 
 const app = express();
@@ -209,7 +208,6 @@ interface DBStructure {
   promoCodeRedeems?: PromoCodeRedeem[];
   donations?: Donation[];
   aiChats?: AiChatMessage[];
-  notifications?: AppNotification[];
 }
 
 const initialDb: DBStructure = {
@@ -233,8 +231,7 @@ const initialDb: DBStructure = {
   promoCodes: [],
   promoCodeRedeems: [],
   donations: [],
-  aiChats: [],
-  notifications: []
+  aiChats: []
 };
 
 // Global DB in-memory cache
@@ -266,23 +263,6 @@ function loadDB() {
       db.promoCodeRedeems = db.promoCodeRedeems || [];
       db.donations = db.donations || [];
       db.aiChats = db.aiChats || [];
-
-      // Seed default always active VIP promo code LUNATIC25 if it doesn't exist
-      const hasLunatic = db.promoCodes.some(c => c.code === 'LUNATIC25');
-      if (!hasLunatic) {
-        db.promoCodes.push({
-          id: 'default-lunatic25',
-          code: 'LUNATIC25',
-          role: 'VIP' as any,
-          duration: '3 días',
-          maxUses: 0,
-          useCount: 0,
-          isActive: true,
-          createdAt: new Date().toISOString()
-        });
-        saveDB();
-      }
-
       if (db.chatCooldown === undefined) {
         db.chatCooldown = 3;
       }
@@ -1961,8 +1941,6 @@ app.post('/api/admin/resources', authenticate, requireRole(UserRole.Recursos), (
   db.resources.unshift(newResource);
   saveDB();
 
-  createAndSendNotification('all', 'Nuevo Recurso Premium', `Se ha publicado el recurso "${name}" en la categoría ${category}.`, 'resource', newResource.id);
-
   logActivity(
     (req as any).user.id,
     (req as any).user.email,
@@ -2150,8 +2128,6 @@ app.post('/api/resources/:resourceId/comments', authenticate, (req, res) => {
   db.comments.push(newComment);
   saveDB();
 
-  createAndSendNotification('all', 'Nuevo Comentario', `${user.username} comentó en el recurso "${resource.name}".`, 'comment', resource.id);
-
   logActivity(
     user.id,
     user.email,
@@ -2255,8 +2231,6 @@ app.post('/api/admin/streaming', authenticate, requireRole(UserRole.CoOwner), (r
   db.streamingAccounts.unshift(newListing);
   saveDB();
 
-  createAndSendNotification('all', 'Nueva Cuenta de Streaming', `Nueva cuenta de ${platform} (${accountType}) disponible.`, 'streaming', newListing.id);
-
   logActivity(
     (req as any).user.id,
     (req as any).user.email,
@@ -2356,8 +2330,6 @@ app.post('/api/admin/announcements', authenticate, requireRole(UserRole.Owner), 
 
   db.announcements.unshift(newAnnouncement);
   saveDB();
-
-  createAndSendNotification('all', 'Nuevo Anuncio', `Anuncio Oficial: "${title}"`, 'announcement', newAnnouncement.id);
 
   logActivity(
     user.id,
@@ -2484,8 +2456,6 @@ app.post('/api/admin/polls', authenticate, requireRole(UserRole.Owner), (req, re
   db.polls.unshift(newPoll);
   saveDB();
 
-  createAndSendNotification('all', 'Nueva Encuesta', `Se ha publicado una nueva votación: "${title}"`, 'poll', newPoll.id);
-
   logActivity(
     (req as any).user.id,
     (req as any).user.email,
@@ -2610,8 +2580,6 @@ app.post('/api/admin/giveaways', authenticate, requireRole(UserRole.CoOwner), (r
 
   db.giveaways.unshift(newGiveaway);
   saveDB();
-
-  createAndSendNotification('all', 'Nuevo Sorteo', `¡Sorteo Activo! Participa por: "${prize}"`, 'giveaway', newGiveaway.id);
 
   logActivity(
     user.id,
@@ -3439,11 +3407,6 @@ app.post('/api/admin/codes/:id/toggle', authenticate, requireRole(UserRole.CoOwn
     return;
   }
 
-  if (codeRecord.code === 'LUNATIC25') {
-    res.status(400).json({ error: 'El código promocional LUNATIC25 es de sistema y debe estar siempre activo.' });
-    return;
-  }
-
   codeRecord.isActive = !codeRecord.isActive;
   saveDB();
 
@@ -3471,11 +3434,6 @@ app.delete('/api/admin/codes/:id', authenticate, requireRole(UserRole.CoOwner), 
   }
 
   const codeStr = db.promoCodes[index].code;
-  if (codeStr === 'LUNATIC25') {
-    res.status(400).json({ error: 'El código promocional LUNATIC25 es de sistema y no se puede eliminar.' });
-    return;
-  }
-
   db.promoCodes.splice(index, 1);
   saveDB();
 
@@ -3643,111 +3601,6 @@ function broadcastMessage(data: any) {
     }
   }
 }
-
-// -------------------------------------------------------------
-// NOTIFICATIONS ENGINE
-// -------------------------------------------------------------
-function createAndSendNotification(
-  userId: string, // Specific user ID, 'all', or 'staff'
-  title: string,
-  message: string,
-  type: 'comment' | 'giveaway' | 'poll' | 'announcement' | 'resource' | 'streaming' | 'review' | 'donation' | 'request',
-  targetId?: string
-) {
-  db.notifications = db.notifications || [];
-  const notification: AppNotification = {
-    id: crypto.randomUUID(),
-    userId,
-    title,
-    message,
-    type,
-    targetId,
-    createdAt: new Date().toISOString(),
-    readBy: []
-  };
-
-  db.notifications.unshift(notification);
-  if (db.notifications.length > 1000) {
-    db.notifications = db.notifications.slice(0, 1000);
-  }
-  saveDB();
-
-  // Send real-time notification to active WS connections that qualify
-  const payload = JSON.stringify({ type: 'notification', notification });
-  for (const client of activeClients) {
-    if (client.ws.readyState === 1) { // WebSocket.OPEN
-      let isTarget = false;
-      if (userId === 'all') {
-        isTarget = true;
-      } else if (userId === 'staff') {
-        const hasStaffRole = client.role === UserRole.Owner || client.role === UserRole.CoOwner || client.role === UserRole.Recursos;
-        if (hasStaffRole) {
-          isTarget = true;
-        }
-      } else if (userId === client.userId) {
-        isTarget = true;
-      }
-
-      if (isTarget) {
-        client.ws.send(payload);
-      }
-    }
-  }
-}
-
-/*
-app.get('/api/notifications', authenticate, (req, res) => {
-  console.log('DEBUG: /api/notifications called');
-  db.notifications = db.notifications || [];
-  const user = (req as any).user as User;
-  const isStaff = user.role === UserRole.Owner || user.role === UserRole.CoOwner || user.role === UserRole.Recursos;
-
-  const filtered = db.notifications.filter(n => {
-    if (n.userId === 'all') return true;
-    if (n.userId === 'staff' && isStaff) return true;
-    if (n.userId === user.id) return true;
-    return false;
-  });
-
-  const mapped = filtered.map(n => ({
-    id: n.id,
-    userId: n.userId,
-    title: n.title,
-    message: n.message,
-    type: n.type,
-    targetId: n.targetId,
-    createdAt: n.createdAt,
-    isRead: n.readBy.includes(user.id)
-  }));
-
-  res.json({ notifications: mapped });
-});
-
-app.post('/api/notifications/read', authenticate, (req, res) => {
-  db.notifications = db.notifications || [];
-  const user = (req as any).user as User;
-  const { id, type, all } = req.body;
-
-  let modified = false;
-
-  db.notifications.forEach(n => {
-    const isTarget = n.userId === 'all' || n.userId === user.id || (n.userId === 'staff' && (user.role === UserRole.Owner || user.role === UserRole.CoOwner || user.role === UserRole.Recursos));
-    if (!isTarget) return;
-
-    const shouldMark = all || (id && n.id === id) || (type && n.type === type);
-    if (shouldMark && !n.readBy.includes(user.id)) {
-      n.readBy.push(user.id);
-      modified = true;
-    }
-  });
-
-  if (modified) {
-    saveDB();
-  }
-
-  res.json({ success: true });
-});
-*/
 
 // -------------------------------------------------------------
 // CHAT GLOBAL ENDPOINTS & COOLDOWN TRACKING
@@ -3987,8 +3840,6 @@ app.put('/api/requests/:id/status', authenticate, requireRole(UserRole.Recursos)
   request.updatedAt = new Date().toISOString();
   saveDB();
 
-  createAndSendNotification(request.userId, 'Avance en tu Solicitud', `Tu solicitud de recurso "${request.name}" ha cambiado a estado: "${status}".`, 'request', request.id);
-
   logActivity(
     user.id,
     user.email,
@@ -4030,8 +3881,6 @@ app.post('/api/requests/:id/comments', authenticate, requireRole(UserRole.Recurs
   request.internalComments.push(newComment);
   request.updatedAt = new Date().toISOString();
   saveDB();
-
-  createAndSendNotification(request.userId, 'Avance en tu Solicitud', `Hay un nuevo comentario del Staff en tu solicitud "${request.name}".`, 'request', request.id);
 
   logActivity(user.id, user.email, 'COMENTARIO_SOLICITUD', `Agregó comentario interno en solicitud "${request.name}"`, req);
   res.json({ success: true, comment: newComment });
@@ -4154,8 +4003,6 @@ app.post('/api/donations', authenticate, (req, res) => {
   db.donations.unshift(newDonation);
   saveDB();
 
-  createAndSendNotification('staff', 'Nueva Donación Recibida', `El usuario ${user.username} ha donado un recurso: "${title}"`, 'donation', newDonation.id);
-
   logActivity(
     user.id,
     user.email,
@@ -4247,8 +4094,6 @@ app.put('/api/admin/donations/:id/status', authenticate, requireRole(UserRole.Co
   }
 
   saveDB();
-
-  createAndSendNotification(donation.userId, 'Avance en tu Donación', `Tu aporte "${donation.title}" ha sido ${status === 'Aprobada' ? 'APROBADO y publicado' : 'RECHAZADO'}.${observation ? ' Observación: ' + observation : ''}`, 'donation', donation.id);
 
   res.json({ success: true, donation, resource: createdResource });
 });
@@ -4369,8 +4214,6 @@ app.post('/api/reviews', authenticate, (req, res) => {
   db.reviews.unshift(newReview);
   saveDB();
 
-  createAndSendNotification('staff', 'Nueva Reseña de la Plataforma', `${user.username} calificó la plataforma con ${ratingNum} estrellas: "${comment.trim().substring(0, 45)}..."`, 'review', newReview.id);
-
   logActivity(
     user.id,
     user.email,
@@ -4445,8 +4288,6 @@ app.post('/api/reviews/:id/reply', authenticate, (req, res) => {
   review.replies = review.replies || [];
   review.replies.push(reply);
   saveDB();
-
-  createAndSendNotification(review.userId, 'Respuesta a tu Reseña', `El administrador ${user.username} ha respondido a tu reseña.`, 'review', review.id);
 
   logActivity(
     user.id,

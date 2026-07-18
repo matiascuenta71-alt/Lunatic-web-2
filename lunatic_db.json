@@ -46,6 +46,15 @@
   "events": [],
   "activityLogs": [
     {
+      "id": "4f844df7-46d3-4010-8720-027b78f1c78d",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "userEmail": "matiascuenta71@gmail.com",
+      "action": "LOGIN",
+      "details": "Inicio de sesión exitoso",
+      "ip": "127.0.0.1",
+      "createdAt": "2026-07-18T17:13:20.960Z"
+    },
+    {
       "id": "87eeb9c9-b3c1-464d-b1aa-33a6f137dda4",
       "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
       "userEmail": "matiascuenta71@gmail.com",
@@ -256,7 +265,8 @@
   "verificationCodes": [],
   "sessions": {
     "eyJpZCI6ImNhNTZmM2YyLWY4NzEtNDg5Yy04OTE1LTYyYmQ1YzZkMWQzMSIsImVtYWlsIjoiZmVpam9vY2FicmVyYThAZ21haWwuY29tIiwidXNlcm5hbWUiOiJVc3VhcmlvIiwicm9sZSI6IlVzdWFyaW8iLCJpc1ZlcmlmaWVkIjp0cnVlLCJjcmVhdGVkQXQiOiIyMDI2LTA3LTEyVDEyOjE1OjU1LjQ3MloiLCJhdmF0YXJVcmwiOiJodHRwczovL2FwaS5kaWNlYmVhci5jb20vNy54L2lkZW50aWNvbi9zdmc/c2VlZD1Vc3VhcmlvIiwicHJvZmlsZUJhY2tncm91bmQiOiJiZy1zbGF0ZS05MDAiLCJpc1N1c3BlbmRlZCI6ZmFsc2UsInBhc3N3b3JkSGFzaCI6ImE0YzYzM2FlN2VhZmI0OGEyZWIyYTNiOTY2NzE5MGNhOmM5OThhMThkZDY0ZGU2ODdjYTU0N2VlY2ZmNjI5N2MxOWY1YzhkZWZkZDIyZmZmN2E1MGE3YTUyZjM4MzYyNTBlZjdjNWIxOWMzYzdjZTJiMmUxYjMzODVmOTZlYWFmNTYyODdjZTMwMjUzZmU3MjM0YjU3NWE1NzMzM2RlZTQyIn0=": "ca56f3f2-f871-489c-8915-62bd5c6d1d31",
-    "eyJpZCI6IjAwNjIwZTZlLWJhMDctNGZlMi1iZjIzLTkzMzY1MWVkNzA3MCIsImVtYWlsIjoibWF0aWFzY3VlbnRhNzFAZ21haWwuY29tIiwidXNlcm5hbWUiOiJBbnRvbmlvIiwicm9sZSI6Ik93bmVyIiwiaXNWZXJpZmllZCI6dHJ1ZSwiY3JlYXRlZEF0IjoiMjAyNi0wNy0xMVQyMDo1OTo1OC4yNjlaIiwiYXZhdGFyVXJsIjoiaHR0cHM6Ly9hcGkuZGljZWJlYXIuY29tLzcueC9pZGVudGljb24vc3ZnP3NlZWQ9QW50b25pbyIsInByb2ZpbGVCYWNrZ3JvdW5kIjoiYmctZ3JhZGllbnQtdG8tYnIgZnJvbS1zbGF0ZS05NTAgdmlhLXB1cnBsZS05NTAgdG8tc2xhdGUtOTUwIiwiaXNTdXNwZW5kZWQiOmZhbHNlLCJwYXNzd29yZEhhc2giOiJhZDRlYjkwNWM3MjBkYjk3ZmY0NzY2OGEyMzAzOTJmNzowNTMxNTYzMDFjZjAwZDI2MWNiMTllM2QzYTZhZGY0OWRhOTkyZDAwYTI0YTlhN2FjMWJjNmM0NGFjYzQ2YjE0YTJkMDI2NjdhYzc5OWUzNjBiZTE1YzM3YmQxMDQ5N2RhNzE5MmE5YTY4MzAwYjdhMDI3MTRlMTQ1MDViYjZhOSJ9": "00620e6e-ba07-4fe2-bf23-933651ed7070"
+    "eyJpZCI6IjAwNjIwZTZlLWJhMDctNGZlMi1iZjIzLTkzMzY1MWVkNzA3MCIsImVtYWlsIjoibWF0aWFzY3VlbnRhNzFAZ21haWwuY29tIiwidXNlcm5hbWUiOiJBbnRvbmlvIiwicm9sZSI6Ik93bmVyIiwiaXNWZXJpZmllZCI6dHJ1ZSwiY3JlYXRlZEF0IjoiMjAyNi0wNy0xMVQyMDo1OTo1OC4yNjlaIiwiYXZhdGFyVXJsIjoiaHR0cHM6Ly9hcGkuZGljZWJlYXIuY29tLzcueC9pZGVudGljb24vc3ZnP3NlZWQ9QW50b25pbyIsInByb2ZpbGVCYWNrZ3JvdW5kIjoiYmctZ3JhZGllbnQtdG8tYnIgZnJvbS1zbGF0ZS05NTAgdmlhLXB1cnBsZS05NTAgdG8tc2xhdGUtOTUwIiwiaXNTdXNwZW5kZWQiOmZhbHNlLCJwYXNzd29yZEhhc2giOiJhZDRlYjkwNWM3MjBkYjk3ZmY0NzY2OGEyMzAzOTJmNzowNTMxNTYzMDFjZjAwZDI2MWNiMTllM2QzYTZhZGY0OWRhOTkyZDAwYTI0YTlhN2FjMWJjNmM0NGFjYzQ2YjE0YTJkMDI2NjdhYzc5OWUzNjBiZTE1YzM3YmQxMDQ5N2RhNzE5MmE5YTY4MzAwYjdhMDI3MTRlMTQ1MDViYjZhOSJ9": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+    "eyJpZCI6IjAwNjIwZTZlLWJhMDctNGZlMi1iZjIzLTkzMzY1MWVkNzA3MCIsImVtYWlsIjoibWF0aWFzY3VlbnRhNzFAZ21haWwuY29tIiwidXNlcm5hbWUiOiJBbnRvbmlvIiwicm9sZSI6Ik93bmVyIiwiaXNWZXJpZmllZCI6dHJ1ZSwiY3JlYXRlZEF0IjoiMjAyNi0wNy0xMVQyMDo1OTo1OC4yNjlaIiwiYXZhdGFyVXJsIjoiaHR0cHM6Ly9hcGkuZGljZWJlYXIuY29tLzcueC9pZGVudGljb24vc3ZnP3NlZWQ9QW50b25pbyIsInByb2ZpbGVCYWNrZ3JvdW5kIjoiYmctYmxhY2siLCJpc1N1c3BlbmRlZCI6ZmFsc2UsInBhc3N3b3JkSGFzaCI6ImFkNGViOTA1YzcyMGRiOTdmZjQ3NjY4YTIzMDM5MmY3OjA1MzE1NjMwMWNmMDBkMjYxY2IxOWUzZDNhNmFkZjQ5ZGE5OTJkMDBhMjRhOWE3YWMxYmM2YzQ0YWNjNDZiMTRhMmQwMjY2N2FjNzk5ZTM2MGJlMTVjMzdiZDEwNDk3ZGE3MTkyYTlhNjgzMDBiN2EwMjcxNGUxNDUwNWJiNmE5IiwiaXAiOiIxMjcuMC4wLjEiLCJ1c2VyQWdlbnQiOiJNb3ppbGxhLzUuMCAoTGludXg7IEFuZHJvaWQgMTA7IEspIEFwcGxlV2ViS2l0LzUzNy4zNiAoS0hUTUwsIGxpa2UgR2Vja28pIENocm9tZS8xNTAuMC4wLjAgTW9iaWxlIFNhZmFyaS81MzcuMzYifQ==.Uwr49HAUds1sBWHmAZhOE6_ypFJBYjbi38O1eEdAPXY": "00620e6e-ba07-4fe2-bf23-933651ed7070"
   },
   "comments": [
     {
@@ -404,5 +414,36 @@
       "createdAt": "2026-07-12T12:52:28.837Z"
     }
   ],
-  "chatCooldown": 10
+  "chatCooldown": 10,
+  "promoCodes": [
+    {
+      "id": "e43b1778-91c6-4b13-9128-d8869c0d9a65",
+      "code": "LUNATIC26",
+      "role": "VIP",
+      "duration": "3d",
+      "maxUses": 0,
+      "useCount": 0,
+      "isActive": true,
+      "createdAt": "2026-07-18T10:14:49Z"
+    }
+  ],
+  "promoCodeRedeems": [],
+  "donations": [],
+  "aiChats": [
+    {
+      "id": "d6da9f6b-be11-4602-9321-ab87155fdd17",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "role": "user",
+      "content": "¿Qué recursos premium de plugins hay?",
+      "createdAt": "2026-07-18T17:13:31.802Z"
+    },
+    {
+      "id": "5b9b97df-1070-4b5d-94f7-48369726d7c8",
+      "userId": "00620e6e-ba07-4fe2-bf23-933651ed7070",
+      "role": "model",
+      "content": "¡Hola, **Antonio**! Qué genial tenerte por aquí. Como **Owner** de la plataforma, tienes las llaves de todo el reino y acceso absoluto a cualquier recurso disponible. 😎⚡\n\nActualmente, en nuestro catálogo oficial de la categoría **Plugins**, contamos con el siguiente recurso premium:\n\n### 🔌 Plugins Disponibles\n\n*   **📦 Nombre:** Prueba\n    *   **Descripción:** Prueba\n    *   **Requisito de Rango:** `VIP` (¡Tú lo superas por completo!)\n    *   **Estado:** 🟢 **Disponible para ti**\n\nAl tener el rango de **Owner**, tienes acceso garantizado. Puedes dirigirte ya mismo a la pestaña de **\"Recursos Premium\"** en la plataforma para disfrutarlo y descargarlo. 🚀\n\n---\n\n### ¿Buscas algo más específico? 🛠️\nSi estás necesitando algún plugin que no se encuentra en esta lista, ¡no te preocupes! Te recomiendo usar de forma proactiva nuestra pestaña de **\"Solicitar Recursos\"** (Solicitudes). Nuestro equipo de administración se encargará de buscarlo y traerlo especialmente para ti. \n\n¿Hay algo más en lo que te pueda ayudar hoy, jefe? 🙌",
+      "createdAt": "2026-07-18T17:13:31.802Z"
+    }
+  ],
+  "sessionSecret": "3f12605f40d797503e0a2e189da6efb9ba744570bbdd2628ddce4c624657038e"
 }
