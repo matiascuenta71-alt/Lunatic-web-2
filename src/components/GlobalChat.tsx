@@ -142,7 +142,7 @@ export default function GlobalChat({ currentUser, token }: GlobalChatProps) {
       };
 
       ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
+        console.warn('Canal del Chat (WebSocket) no disponible temporalmente. Reintentando...');
         setWsStatus('disconnected');
       };
     }

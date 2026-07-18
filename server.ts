@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
+import { GoogleGenAI } from '@google/genai';
 import {
   UserRole,
   ROLE_HIERARCHY,
@@ -24,7 +25,9 @@ import {
   type RequestComment,
   type PromoCode,
   type PromoCodeRedeem,
-  type Donation
+  type Donation,
+  type AiChatMessage,
+  type AppNotification
 } from './src/types';
 
 const app = express();
@@ -205,6 +208,8 @@ interface DBStructure {
   promoCodes?: PromoCode[];
   promoCodeRedeems?: PromoCodeRedeem[];
   donations?: Donation[];
+  aiChats?: AiChatMessage[];
+  notifications?: AppNotification[];
 }
 
 const initialDb: DBStructure = {
@@ -227,7 +232,9 @@ const initialDb: DBStructure = {
   sessionSecret: crypto.randomBytes(32).toString('hex'),
   promoCodes: [],
   promoCodeRedeems: [],
-  donations: []
+  donations: [],
+  aiChats: [],
+  notifications: []
 };
 
 // Global DB in-memory cache
@@ -258,6 +265,24 @@ function loadDB() {
       db.promoCodes = db.promoCodes || [];
       db.promoCodeRedeems = db.promoCodeRedeems || [];
       db.donations = db.donations || [];
+      db.aiChats = db.aiChats || [];
+
+      // Seed default always active VIP promo code LUNATIC25 if it doesn't exist
+      const hasLunatic = db.promoCodes.some(c => c.code === 'LUNATIC25');
+      if (!hasLunatic) {
+        db.promoCodes.push({
+          id: 'default-lunatic25',
+          code: 'LUNATIC25',
+          role: 'VIP' as any,
+          duration: '3 días',
+          maxUses: 0,
+          useCount: 0,
+          isActive: true,
+          createdAt: new Date().toISOString()
+        });
+        saveDB();
+      }
+
       if (db.chatCooldown === undefined) {
         db.chatCooldown = 3;
       }
@@ -1446,6 +1471,190 @@ app.get('/api/auth/me', authenticate, (req, res) => {
 });
 
 // -------------------------------------------------------------
+// PRIVATE AI ASSISTANT ENDPOINTS
+// -------------------------------------------------------------
+
+// Lazy-loaded Gemini AI client setup
+let aiClient: GoogleGenAI | null = null;
+function getAI(): GoogleGenAI {
+  if (!aiClient) {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno del servidor.');
+    }
+    aiClient = new GoogleGenAI({
+      apiKey: key,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+  }
+  return aiClient;
+}
+
+// Helper to prune chats older than 4 hours automatically
+function pruneOldChats() {
+  db.aiChats = db.aiChats || [];
+  const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+  const initialLength = db.aiChats.length;
+  db.aiChats = db.aiChats.filter(m => m.createdAt >= fourHoursAgo);
+  if (db.aiChats.length !== initialLength) {
+    saveDB();
+  }
+}
+
+// 1. Get user AI chat history (Private to user)
+app.get('/api/ai/history', authenticate, (req, res) => {
+  const userId = (req as any).user.id;
+  pruneOldChats();
+  const userChats = db.aiChats.filter(m => m.userId === userId);
+  res.json({ history: userChats });
+});
+
+// 2. Chat with Gemini (Private, includes current resources/streaming data context)
+app.post('/api/ai/chat', authenticate, async (req, res) => {
+  try {
+    const userId = (req as any).user.id;
+    const userRole = (req as any).user.role;
+    const username = (req as any).user.username;
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+      return;
+    }
+
+    // Prune old chats
+    pruneOldChats();
+
+    // Initialize/validate GenAI client
+    let ai;
+    try {
+      ai = getAI();
+    } catch (err: any) {
+      console.error('Gemini init failed:', err);
+      res.status(503).json({ 
+        error: 'Servicio de IA temporalmente no disponible.',
+        details: 'El administrador aún no ha configurado la clave API de Gemini (GEMINI_API_KEY) en los Secretos de la plataforma.' 
+      });
+      return;
+    }
+
+    // Get private history of this user
+    db.aiChats = db.aiChats || [];
+    const userChats = db.aiChats.filter(m => m.userId === userId);
+    // Use last 12 messages as context to fit well and keep reasoning coherent
+    const contextHistory = userChats.slice(-12);
+
+    // Format history for @google/genai contents
+    const contents = contextHistory.map(m => ({
+      role: m.role,
+      parts: [{ text: m.content }]
+    }));
+
+    // Add current user message
+    contents.push({
+      role: 'user',
+      parts: [{ text: message }]
+    });
+
+    // Prepare lists of resources and streaming accounts (omit sensitive fields like pass, email)
+    const availableResources = db.resources.map(r => ({
+      name: r.name,
+      description: r.description,
+      category: r.category,
+      minRole: r.minRole
+    }));
+
+    const availableStreaming = db.streamingAccounts.map(s => ({
+      platform: s.platform,
+      accountType: s.accountType,
+      description: s.description,
+      minRole: s.minRole
+    }));
+
+    // Instructions guiding the model to act as a custom helpful recommender
+    const systemInstruction = `Eres "Lunatic IA", la Inteligencia Artificial asistente oficial de la plataforma Lunatic.
+Tu misión es ayudar a los usuarios a navegar por la plataforma, buscar y recomendar recursos o cuentas de streaming de forma personalizada y segura.
+Cada chat es privado e independiente por usuario.
+
+El usuario actual es:
+- Nombre: ${username}
+- Rango/Rol actual: ${userRole}
+
+A continuación tienes el catálogo oficial y real de recursos disponibles en la plataforma (usa esta información para recomendar y buscar):
+${JSON.stringify(availableResources, null, 2)}
+
+A continuación tienes el catálogo oficial y real de cuentas de streaming gratis en la plataforma:
+${JSON.stringify(availableStreaming, null, 2)}
+
+REGLAS CRÍTICAS:
+1. SÓLO busca y recomienda recursos y cuentas de streaming reales que se encuentren listados arriba. No inventes elementos inexistentes.
+2. Compara el Rango/Rol actual del usuario (${userRole}) con el rango requerido ("minRole") del recurso o cuenta.
+   - Si el usuario TIENE acceso (su rol es igual o superior en la jerarquía: Owner > Co-Owner > Recursos > Mega VIP > Super VIP > VIP > Usuario), anímalo a descargarlo o disfrutarlo en sus respectivas pestañas ("Recursos Premium" o "Streaming Gratis").
+   - Si el usuario NO TIENE acceso (el rango minRole es superior), explícale con amabilidad que para acceder a ese recurso/cuenta necesita ascender de rango (por ejemplo, a VIP o Super VIP), pero menciónale los detalles para que sepa qué ofrece.
+3. Responde siempre en Español con un tono moderno, gamer/técnico, amigable, educado y muy entusiasta.
+4. Usa formato Markdown hermoso (negritas, listas con viñetas, tablas, advertencias con emojis, bloques de código, etc.) para que la lectura sea placentera.
+5. Si el usuario pide un recurso que no se encuentra en el catálogo, recomiéndale de forma proactiva que use la pestaña "Solicitar Recursos" (Solicitudes) para que los administradores puedan conseguirlo.
+6. Mantén las respuestas fluidas y concisas.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents,
+      config: {
+        systemInstruction
+      }
+    });
+
+    const reply = response.text || 'Disculpa, no logré formular una respuesta en este momento. Por favor, intenta de nuevo.';
+
+    // Create and save messages
+    const userMsg: AiChatMessage = {
+      id: crypto.randomUUID(),
+      userId,
+      role: 'user',
+      content: message,
+      createdAt: new Date().toISOString()
+    };
+
+    const modelMsg: AiChatMessage = {
+      id: crypto.randomUUID(),
+      userId,
+      role: 'model',
+      content: reply,
+      createdAt: new Date().toISOString()
+    };
+
+    db.aiChats.push(userMsg, modelMsg);
+
+    // Limit memory usage (maximum 100 messages total stored per user)
+    const allUserChats = db.aiChats.filter(m => m.userId === userId);
+    if (allUserChats.length > 100) {
+      const toRemove = allUserChats.slice(0, allUserChats.length - 100).map(m => m.id);
+      db.aiChats = db.aiChats.filter(m => !toRemove.includes(m.id));
+    }
+
+    saveDB();
+
+    res.json({ userMessage: userMsg, aiMessage: modelMsg });
+  } catch (err: any) {
+    console.error('AI chat processing error:', err);
+    res.status(500).json({ error: 'Error al procesar el mensaje con el asistente IA.', details: err.message });
+  }
+});
+
+// 3. Clear private AI chat history
+app.post('/api/ai/clear', authenticate, (req, res) => {
+  const userId = (req as any).user.id;
+  db.aiChats = db.aiChats || [];
+  db.aiChats = db.aiChats.filter(m => m.userId !== userId);
+  saveDB();
+  res.json({ message: 'Historial de chat borrado exitosamente.' });
+});
+
+// -------------------------------------------------------------
 // PROFILE ENDPOINTS
 // -------------------------------------------------------------
 app.put('/api/profile', authenticate, (req, res) => {
@@ -1752,6 +1961,8 @@ app.post('/api/admin/resources', authenticate, requireRole(UserRole.Recursos), (
   db.resources.unshift(newResource);
   saveDB();
 
+  createAndSendNotification('all', 'Nuevo Recurso Premium', `Se ha publicado el recurso "${name}" en la categoría ${category}.`, 'resource', newResource.id);
+
   logActivity(
     (req as any).user.id,
     (req as any).user.email,
@@ -1939,6 +2150,8 @@ app.post('/api/resources/:resourceId/comments', authenticate, (req, res) => {
   db.comments.push(newComment);
   saveDB();
 
+  createAndSendNotification('all', 'Nuevo Comentario', `${user.username} comentó en el recurso "${resource.name}".`, 'comment', resource.id);
+
   logActivity(
     user.id,
     user.email,
@@ -2042,6 +2255,8 @@ app.post('/api/admin/streaming', authenticate, requireRole(UserRole.CoOwner), (r
   db.streamingAccounts.unshift(newListing);
   saveDB();
 
+  createAndSendNotification('all', 'Nueva Cuenta de Streaming', `Nueva cuenta de ${platform} (${accountType}) disponible.`, 'streaming', newListing.id);
+
   logActivity(
     (req as any).user.id,
     (req as any).user.email,
@@ -2141,6 +2356,8 @@ app.post('/api/admin/announcements', authenticate, requireRole(UserRole.Owner), 
 
   db.announcements.unshift(newAnnouncement);
   saveDB();
+
+  createAndSendNotification('all', 'Nuevo Anuncio', `Anuncio Oficial: "${title}"`, 'announcement', newAnnouncement.id);
 
   logActivity(
     user.id,
@@ -2267,6 +2484,8 @@ app.post('/api/admin/polls', authenticate, requireRole(UserRole.Owner), (req, re
   db.polls.unshift(newPoll);
   saveDB();
 
+  createAndSendNotification('all', 'Nueva Encuesta', `Se ha publicado una nueva votación: "${title}"`, 'poll', newPoll.id);
+
   logActivity(
     (req as any).user.id,
     (req as any).user.email,
@@ -2391,6 +2610,8 @@ app.post('/api/admin/giveaways', authenticate, requireRole(UserRole.CoOwner), (r
 
   db.giveaways.unshift(newGiveaway);
   saveDB();
+
+  createAndSendNotification('all', 'Nuevo Sorteo', `¡Sorteo Activo! Participa por: "${prize}"`, 'giveaway', newGiveaway.id);
 
   logActivity(
     user.id,
@@ -2916,8 +3137,16 @@ app.put('/api/admin/users/:id/role', authenticate, requireRole(UserRole.CoOwner)
 app.get('/api/admin/codes', authenticate, requireRole(UserRole.CoOwner), (req, res) => {
   db.promoCodes = db.promoCodes || [];
   db.promoCodeRedeems = db.promoCodeRedeems || [];
+  
+  // Backward compatibility / UI alignment
+  const mappedCodes = db.promoCodes.map(c => ({
+    ...c,
+    currentUses: c.useCount !== undefined ? c.useCount : (c as any).currentUses || 0,
+    useCount: c.useCount !== undefined ? c.useCount : (c as any).currentUses || 0
+  }));
+
   res.json({
-    codes: db.promoCodes,
+    codes: mappedCodes,
     redeems: db.promoCodeRedeems
   });
 });
@@ -2946,17 +3175,23 @@ app.post('/api/admin/codes', authenticate, requireRole(UserRole.CoOwner), (req, 
     return;
   }
 
+  // Support 0 as infinite limit
+  const parsedMaxUses = (maxUses !== undefined && maxUses !== null && maxUses !== '') ? Number(maxUses) : 0;
+
   const newCode: PromoCode = {
     id: crypto.randomUUID(),
     code,
     role: role as UserRole,
     duration: duration || 'Permanente',
-    maxUses: maxUses ? Number(maxUses) : 1,
+    maxUses: parsedMaxUses,
     useCount: 0,
     expiresAt: expiresAt || undefined,
     isActive: true,
     createdAt: new Date().toISOString()
   };
+
+  // Add currentUses for compatibility
+  (newCode as any).currentUses = 0;
 
   db.promoCodes.unshift(newCode);
   saveDB();
@@ -3029,8 +3264,8 @@ app.post('/api/codes/redeem', authenticate, (req, res) => {
     return;
   }
 
-  // Check usages
-  if (codeRecord.useCount >= codeRecord.maxUses) {
+  // Check usages (maxUses <= 0 means infinite limit)
+  if (codeRecord.maxUses > 0 && codeRecord.useCount >= codeRecord.maxUses) {
     const redeemLog: PromoCodeRedeem = {
       id: crypto.randomUUID(),
       codeId: codeRecord.id,
@@ -3149,7 +3384,8 @@ app.post('/api/codes/redeem', authenticate, (req, res) => {
   }
 
   // Increment usage count
-  codeRecord.useCount++;
+  codeRecord.useCount = (codeRecord.useCount || 0) + 1;
+  (codeRecord as any).currentUses = codeRecord.useCount;
 
   // Log successful redemption
   const redeemLog: PromoCodeRedeem = {
@@ -3203,6 +3439,11 @@ app.post('/api/admin/codes/:id/toggle', authenticate, requireRole(UserRole.CoOwn
     return;
   }
 
+  if (codeRecord.code === 'LUNATIC25') {
+    res.status(400).json({ error: 'El código promocional LUNATIC25 es de sistema y debe estar siempre activo.' });
+    return;
+  }
+
   codeRecord.isActive = !codeRecord.isActive;
   saveDB();
 
@@ -3230,6 +3471,11 @@ app.delete('/api/admin/codes/:id', authenticate, requireRole(UserRole.CoOwner), 
   }
 
   const codeStr = db.promoCodes[index].code;
+  if (codeStr === 'LUNATIC25') {
+    res.status(400).json({ error: 'El código promocional LUNATIC25 es de sistema y no se puede eliminar.' });
+    return;
+  }
+
   db.promoCodes.splice(index, 1);
   saveDB();
 
@@ -3397,6 +3643,108 @@ function broadcastMessage(data: any) {
     }
   }
 }
+
+// -------------------------------------------------------------
+// NOTIFICATIONS ENGINE
+// -------------------------------------------------------------
+function createAndSendNotification(
+  userId: string, // Specific user ID, 'all', or 'staff'
+  title: string,
+  message: string,
+  type: 'comment' | 'giveaway' | 'poll' | 'announcement' | 'resource' | 'streaming' | 'review' | 'donation' | 'request',
+  targetId?: string
+) {
+  db.notifications = db.notifications || [];
+  const notification: AppNotification = {
+    id: crypto.randomUUID(),
+    userId,
+    title,
+    message,
+    type,
+    targetId,
+    createdAt: new Date().toISOString(),
+    readBy: []
+  };
+
+  db.notifications.unshift(notification);
+  if (db.notifications.length > 1000) {
+    db.notifications = db.notifications.slice(0, 1000);
+  }
+  saveDB();
+
+  // Send real-time notification to active WS connections that qualify
+  const payload = JSON.stringify({ type: 'notification', notification });
+  for (const client of activeClients) {
+    if (client.ws.readyState === 1) { // WebSocket.OPEN
+      let isTarget = false;
+      if (userId === 'all') {
+        isTarget = true;
+      } else if (userId === 'staff') {
+        const hasStaffRole = client.role === UserRole.Owner || client.role === UserRole.CoOwner || client.role === UserRole.Recursos;
+        if (hasStaffRole) {
+          isTarget = true;
+        }
+      } else if (userId === client.userId) {
+        isTarget = true;
+      }
+
+      if (isTarget) {
+        client.ws.send(payload);
+      }
+    }
+  }
+}
+
+app.get('/api/notifications', authenticate, (req, res) => {
+  db.notifications = db.notifications || [];
+  const user = (req as any).user as User;
+  const isStaff = user.role === UserRole.Owner || user.role === UserRole.CoOwner || user.role === UserRole.Recursos;
+
+  const filtered = db.notifications.filter(n => {
+    if (n.userId === 'all') return true;
+    if (n.userId === 'staff' && isStaff) return true;
+    if (n.userId === user.id) return true;
+    return false;
+  });
+
+  const mapped = filtered.map(n => ({
+    id: n.id,
+    userId: n.userId,
+    title: n.title,
+    message: n.message,
+    type: n.type,
+    targetId: n.targetId,
+    createdAt: n.createdAt,
+    isRead: n.readBy.includes(user.id)
+  }));
+
+  res.json({ notifications: mapped });
+});
+
+app.post('/api/notifications/read', authenticate, (req, res) => {
+  db.notifications = db.notifications || [];
+  const user = (req as any).user as User;
+  const { id, type, all } = req.body;
+
+  let modified = false;
+
+  db.notifications.forEach(n => {
+    const isTarget = n.userId === 'all' || n.userId === user.id || (n.userId === 'staff' && (user.role === UserRole.Owner || user.role === UserRole.CoOwner || user.role === UserRole.Recursos));
+    if (!isTarget) return;
+
+    const shouldMark = all || (id && n.id === id) || (type && n.type === type);
+    if (shouldMark && !n.readBy.includes(user.id)) {
+      n.readBy.push(user.id);
+      modified = true;
+    }
+  });
+
+  if (modified) {
+    saveDB();
+  }
+
+  res.json({ success: true });
+});
 
 // -------------------------------------------------------------
 // CHAT GLOBAL ENDPOINTS & COOLDOWN TRACKING
@@ -3636,6 +3984,8 @@ app.put('/api/requests/:id/status', authenticate, requireRole(UserRole.Recursos)
   request.updatedAt = new Date().toISOString();
   saveDB();
 
+  createAndSendNotification(request.userId, 'Avance en tu Solicitud', `Tu solicitud de recurso "${request.name}" ha cambiado a estado: "${status}".`, 'request', request.id);
+
   logActivity(
     user.id,
     user.email,
@@ -3677,6 +4027,8 @@ app.post('/api/requests/:id/comments', authenticate, requireRole(UserRole.Recurs
   request.internalComments.push(newComment);
   request.updatedAt = new Date().toISOString();
   saveDB();
+
+  createAndSendNotification(request.userId, 'Avance en tu Solicitud', `Hay un nuevo comentario del Staff en tu solicitud "${request.name}".`, 'request', request.id);
 
   logActivity(user.id, user.email, 'COMENTARIO_SOLICITUD', `Agregó comentario interno en solicitud "${request.name}"`, req);
   res.json({ success: true, comment: newComment });
@@ -3799,6 +4151,8 @@ app.post('/api/donations', authenticate, (req, res) => {
   db.donations.unshift(newDonation);
   saveDB();
 
+  createAndSendNotification('staff', 'Nueva Donación Recibida', `El usuario ${user.username} ha donado un recurso: "${title}"`, 'donation', newDonation.id);
+
   logActivity(
     user.id,
     user.email,
@@ -3890,6 +4244,8 @@ app.put('/api/admin/donations/:id/status', authenticate, requireRole(UserRole.Co
   }
 
   saveDB();
+
+  createAndSendNotification(donation.userId, 'Avance en tu Donación', `Tu aporte "${donation.title}" ha sido ${status === 'Aprobada' ? 'APROBADO y publicado' : 'RECHAZADO'}.${observation ? ' Observación: ' + observation : ''}`, 'donation', donation.id);
 
   res.json({ success: true, donation, resource: createdResource });
 });
@@ -4010,6 +4366,8 @@ app.post('/api/reviews', authenticate, (req, res) => {
   db.reviews.unshift(newReview);
   saveDB();
 
+  createAndSendNotification('staff', 'Nueva Reseña de la Plataforma', `${user.username} calificó la plataforma con ${ratingNum} estrellas: "${comment.trim().substring(0, 45)}..."`, 'review', newReview.id);
+
   logActivity(
     user.id,
     user.email,
@@ -4084,6 +4442,8 @@ app.post('/api/reviews/:id/reply', authenticate, (req, res) => {
   review.replies = review.replies || [];
   review.replies.push(reply);
   saveDB();
+
+  createAndSendNotification(review.userId, 'Respuesta a tu Reseña', `El administrador ${user.username} ha respondido a tu reseña.`, 'review', review.id);
 
   logActivity(
     user.id,

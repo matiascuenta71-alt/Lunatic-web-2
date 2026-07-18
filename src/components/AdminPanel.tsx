@@ -2192,15 +2192,16 @@ export default function AdminPanel({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">Usos Máximos</label>
+                  <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">Usos Máximos (0 para ilimitado/infinito)</label>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     required
                     value={newCodeMaxUses}
                     onChange={(e) => setNewCodeMaxUses(Number(e.target.value))}
                     className="w-full px-3.5 py-2 bg-slate-950 border border-slate-850 rounded-xl text-slate-100 text-xs font-mono focus:border-indigo-500 focus:outline-none transition"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">Coloca 0 si deseas que el código no tenga límite de usos.</p>
                 </div>
 
                 <div>
@@ -2249,7 +2250,7 @@ export default function AdminPanel({
                       ) : (
                         paginatedCodes.map((c) => {
                           const isExpired = c.expiresAt && new Date() > new Date(c.expiresAt);
-                          const isLimitReached = c.currentUses >= c.maxUses;
+                          const isLimitReached = c.maxUses > 0 && c.currentUses >= c.maxUses;
                           return (
                             <tr key={c.id} className="hover:bg-slate-950/10 transition">
                               <td className="px-5 py-3 font-bold text-indigo-400 select-all truncate max-w-[120px]" title={c.code}>
@@ -2265,7 +2266,7 @@ export default function AdminPanel({
                               </td>
                               <td className="px-5 py-3 text-center">
                                 <span className={isLimitReached ? 'text-red-400 font-bold' : 'text-slate-200'}>
-                                  {c.currentUses}/{c.maxUses}
+                                  {c.currentUses}/{c.maxUses === 0 ? '∞' : c.maxUses}
                                 </span>
                               </td>
                               <td className="px-5 py-3 text-[10px] text-slate-500">

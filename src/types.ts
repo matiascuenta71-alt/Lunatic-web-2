@@ -287,4 +287,25 @@ export interface Donation {
   updatedAt: string;
 }
 
+export interface AiChatMessage {
+  id: string;
+  userId: string;
+  role: 'user' | 'model';
+  content: string;
+  createdAt: string;
+}
+
+export interface AppNotification {
+  id: string;
+  userId: string; // Specific user ID, 'all', or 'staff'
+  title: string;
+  message: string;
+  type: 'comment' | 'giveaway' | 'poll' | 'announcement' | 'resource' | 'streaming' | 'review' | 'donation' | 'request';
+  targetId?: string;
+  createdAt: string;
+  readBy: string[]; // List of user IDs who have read this notification
+  isRead?: boolean; // Client-side flag computed by API or updated locally
+}
+
+
 
