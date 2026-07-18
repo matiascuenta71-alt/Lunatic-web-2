@@ -31,7 +31,7 @@ import {
 } from './src/types';
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 
 // Enable JSON body parsing with large limit for file uploads
 app.use(express.json({ limit: '50mb' }));
