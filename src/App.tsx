@@ -30,7 +30,6 @@ import {
   MessageCircle,
   Upload,
   Bot,
-  Bell,
   CheckCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -522,197 +521,6 @@ export default function App() {
   // Filters inside views
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  // Notifications State
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [bellOpen, setBellOpen] = useState(false);
-
-  // Fetch notifications
-  // Mark all notifications of a type as read
-  const markNotificationsAsRead = async (type: string) => {
-    if (!token) return;
-    try {
-      const res = await fetch('/api/notifications/read', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ type })
-      });
-      if (res.ok) {
-        setNotifications(prev => prev.map(n => n.type === type ? { ...n, isRead: true } : n));
-      }
-    } catch (err) {
-      console.error('Error marking notifications as read:', err);
-    }
-  };
-
-  // Mark single as read
-  const markSingleAsRead = async (id: string) => {
-    if (!token) return;
-    try {
-      const res = await fetch('/api/notifications/read', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ id })
-      });
-      if (res.ok) {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-      }
-    } catch (err) {
-      console.error('Error marking single notification as read:', err);
-    }
-  };
-
-  // Mark all as read
-  const markAllAsRead = async () => {
-    if (!token) return;
-    try {
-      const res = await fetch('/api/notifications/read', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ all: true })
-      });
-      if (res.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      }
-    } catch (err) {
-      console.error('Error marking all notifications as read:', err);
-    }
-  };
-
-  // Get unread count for a specific tab
-  const getUnreadCount = (tab: TabType): number => {
-    const unread = notifications.filter(n => !n.isRead);
-    switch (tab) {
-      case 'announcements':
-        return unread.filter(n => n.type === 'announcement').length;
-      case 'polls':
-        return unread.filter(n => n.type === 'poll').length;
-      case 'events':
-        return unread.filter(n => n.type === 'giveaway').length;
-      case 'resources':
-        return unread.filter(n => n.type === 'resource' || n.type === 'comment').length;
-      case 'streaming':
-        return unread.filter(n => n.type === 'streaming').length;
-      case 'reviews':
-        return unread.filter(n => n.type === 'review').length;
-      case 'donations':
-        return unread.filter(n => n.type === 'donation').length;
-      case 'requests':
-        return unread.filter(n => n.type === 'request').length;
-      default:
-        return 0;
-    }
-  };
-
-  // Custom tab change handler to clear notification badges
-  const handleTabChange = (tab: TabType) => {
-    setActiveTab(tab);
-    setMobileMenuOpen(false);
-
-    if (tab === 'announcements') markNotificationsAsRead('announcement');
-    else if (tab === 'polls') markNotificationsAsRead('poll');
-    else if (tab === 'events') markNotificationsAsRead('giveaway');
-    else if (tab === 'resources') {
-      markNotificationsAsRead('resource');
-      markNotificationsAsRead('comment');
-    }
-    else if (tab === 'streaming') markNotificationsAsRead('streaming');
-    else if (tab === 'reviews') markNotificationsAsRead('review');
-    else if (tab === 'donations') markNotificationsAsRead('donation');
-    else if (tab === 'requests') markNotificationsAsRead('request');
-  };
-
-  // Set up WebSocket for Notifications with Polling Fallback
-  useEffect(() => {
-    if (!token) return;
-
-    fetchPlatformData();
-
-    let ws: WebSocket | null = null;
-    let pingInterval: any;
-    let reconnectTimer: any;
-    let isClosed = false;
-
-    const connectWS = () => {
-      if (isClosed) return;
-      try {
-        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const wsUrl = `${protocol}://${window.location.host}/api/ws`;
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-          if (!ws) return;
-          ws.send(JSON.stringify({ type: 'auth', token }));
-
-          pingInterval = setInterval(() => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: 'ping' }));
-            }
-          }, 30000);
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === 'notification') {
-              const newNotif = data.notification;
-              setNotifications(prev => {
-                if (prev.some(n => n.id === newNotif.id)) return prev;
-                return [newNotif, ...prev];
-              });
-              // Refresh underlying datasets dynamically
-              fetchPlatformData();
-            }
-          } catch (err) {
-            console.error('Error handling WebSocket message in App.tsx:', err);
-          }
-        };
-
-        ws.onerror = () => {
-          // Handle WebSocket error gracefully to avoid uncaught console errors
-          console.warn('Canal de tiempo real (WebSocket) no disponible temporalmente. Usando respaldo de sondeo.');
-        };
-
-        ws.onclose = () => {
-          clearInterval(pingInterval);
-          // Try reconnecting in 10 seconds if not unmounted
-          if (!isClosed) {
-            reconnectTimer = setTimeout(connectWS, 10000);
-          }
-        };
-      } catch (err) {
-        console.warn('Fallo al inicializar WebSocket, usando respaldo de sondeo.', err);
-      }
-    };
-
-    connectWS();
-
-    // Polling fallback: fetch notifications every 20 seconds
-    const fallbackInterval = setInterval(() => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        // fetchNotifications(); // Removed due to endpoint issues
-      }
-    }, 20000);
-
-    return () => {
-      isClosed = true;
-      if (ws) {
-        ws.close();
-      }
-      clearInterval(pingInterval);
-      clearInterval(fallbackInterval);
-      clearTimeout(reconnectTimer);
-    };
-  }, [token]);
-
   // Load public data on mount
   const fetchPublicStats = async () => {
     try {
@@ -976,11 +784,7 @@ export default function App() {
             >
               <Megaphone className="h-4 w-4" />
               <span>📢・Anuncios</span>
-              {getUnreadCount('announcements') > 0 && (
-                <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                  +{getUnreadCount('announcements')}
-                </span>
-              )}
+
             </button>
             <button
               onClick={() => handleTabChange('polls')}
@@ -990,11 +794,7 @@ export default function App() {
             >
               <Vote className="h-4 w-4" />
               <span>🗳️・Votaciones</span>
-              {getUnreadCount('polls') > 0 && (
-                <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                  +{getUnreadCount('polls')}
-                </span>
-              )}
+
             </button>
           </div>
 
@@ -1011,11 +811,7 @@ export default function App() {
             >
               <FileCode className="h-4 w-4" />
               <span>💎・Recursos Premium</span>
-              {getUnreadCount('resources') > 0 && (
-                <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                  +{getUnreadCount('resources')}
-                </span>
-              )}
+
             </button>
             <button
               onClick={() => handleTabChange('requests')}
@@ -1025,11 +821,7 @@ export default function App() {
             >
               <ClipboardList className="h-4 w-4 text-emerald-400" />
               <span>📝・Solicitar Recursos</span>
-              {getUnreadCount('requests') > 0 && (
-                <span className="ml-auto bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md animate-pulse">
-                  NUEVO
-                </span>
-              )}
+
             </button>
             <button
               onClick={() => handleTabChange('donations')}
@@ -1039,11 +831,7 @@ export default function App() {
             >
               <Upload className="h-4 w-4 text-cyan-400" />
               <span>📥・Donar Recursos</span>
-              {getUnreadCount('donations') > 0 && (
-                <span className={`ml-auto text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md animate-pulse ${isStaff ? 'bg-rose-500 rounded-full text-[10px]' : 'bg-emerald-500'}`}>
-                  {isStaff ? `+${getUnreadCount('donations')}` : 'NUEVO'}
-                </span>
-              )}
+
             </button>
             <button
               onClick={() => handleTabChange('vip')}
@@ -1087,11 +875,7 @@ export default function App() {
             >
               <MessageCircle className="h-4 w-4 text-teal-400" />
               <span>💭・Canal de Reseñas</span>
-              {getUnreadCount('reviews') > 0 && (
-                <span className={`ml-auto text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md animate-pulse ${isStaff ? 'bg-rose-500 rounded-full text-[10px]' : 'bg-emerald-500'}`}>
-                  {isStaff ? `+${getUnreadCount('reviews')}` : 'NUEVO'}
-                </span>
-              )}
+
             </button>
             <button
               onClick={() => handleTabChange('events')}
@@ -1101,11 +885,7 @@ export default function App() {
             >
               <Gift className="h-4 w-4 text-purple-400" />
               <span>🎉・Sorteos & Eventos</span>
-              {getUnreadCount('events') > 0 && (
-                <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                  +{getUnreadCount('events')}
-                </span>
-              )}
+
             </button>
           </div>
 
@@ -1122,11 +902,7 @@ export default function App() {
             >
               <Tv className="h-4 w-4 text-cyan-400" />
               <span>📺・Streaming Gratis</span>
-              {getUnreadCount('streaming') > 0 && (
-                <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                  +{getUnreadCount('streaming')}
-                </span>
-              )}
+
             </button>
           </div>
 
@@ -1274,102 +1050,9 @@ export default function App() {
               </div>
             )}
 
-            {/* Notification Bell Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setBellOpen(!bellOpen)}
-                className={`p-2 rounded-xl border transition relative shrink-0 ${
-                  bellOpen 
-                    ? 'bg-slate-800 border-slate-700 text-white shadow-lg' 
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-900/80'
-                }`}
-                title="Notificaciones"
-              >
-                <Bell className="h-4 w-4" />
-                {notifications.filter(n => !n.isRead).length > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white animate-pulse">
-                    {notifications.filter(n => !n.isRead).length}
-                  </span>
-                )}
-              </button>
 
-              <AnimatePresence>
-                {bellOpen && (
-                  <>
-                    {/* Invisible backdrop to close dropdown */}
-                    <div className="fixed inset-0 z-40" onClick={() => setBellOpen(false)} />
 
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 mt-2 w-80 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/80 z-50 overflow-hidden"
-                    >
-                      {/* Dropdown Header */}
-                      <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Bell className="h-4 w-4 text-indigo-400" />
-                          <h3 className="font-semibold text-xs text-slate-200">Notificaciones</h3>
-                        </div>
-                        {notifications.some(n => !n.isRead) && (
-                          <button
-                            onClick={() => { markAllAsRead(); }}
-                            className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold transition flex items-center gap-1 cursor-pointer"
-                          >
-                            <CheckCheck className="h-3 w-3" />
-                            Marcar todo leído
-                          </button>
-                        )}
-                      </div>
 
-                      {/* Dropdown Content */}
-                      <div className="max-h-72 overflow-y-auto divide-y divide-slate-800/60">
-                        {notifications.length === 0 ? (
-                          <div className="p-6 text-center text-slate-500">
-                            <p className="text-xs">No tienes notificaciones en este momento.</p>
-                          </div>
-                        ) : (
-                          notifications.map((n) => {
-                            const targetTab = getTargetTabForNotification(n.type);
-                            return (
-                              <div
-                                key={n.id}
-                                onClick={() => {
-                                  markSingleAsRead(n.id);
-                                  handleTabChange(targetTab);
-                                  setBellOpen(false);
-                                }}
-                                className={`p-3.5 text-left cursor-pointer transition flex items-start gap-3 hover:bg-slate-800/40 ${
-                                  !n.isRead ? 'bg-slate-950/40' : ''
-                                }`}
-                              >
-                                {/* Status indicator dot */}
-                                <div className="mt-1">
-                                  <span className={`block h-2 w-2 rounded-full shrink-0 ${
-                                    !n.isRead ? 'bg-indigo-500 animate-pulse' : 'bg-slate-700'
-                                  }`} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-semibold text-[11px] text-slate-200 truncate">{n.title}</h4>
-                                  <p className="text-[10px] text-slate-450 mt-0.5 leading-relaxed break-words">{n.message}</p>
-                                  <span className="text-[9px] text-slate-600 font-mono block mt-1.5">
-                                    {new Date(n.createdAt).toLocaleDateString('es-ES', {
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
           </div>
         </div>
 
