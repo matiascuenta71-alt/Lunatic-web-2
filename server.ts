@@ -1442,7 +1442,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 // ME (GET USER SESSION)
 app.get('/api/auth/me', authenticate, (req, res) => {
-  res.json({ user: (req as any).user });
+  res.json({ user: (req as any).user, token: (req as any).token });
 });
 
 // -------------------------------------------------------------

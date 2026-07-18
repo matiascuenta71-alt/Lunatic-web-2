@@ -413,22 +413,34 @@ export default function App() {
     }
   };
 
-  // Check active user session on load/re-render via secure HttpOnly cookie
+  // Check active user session on load/re-render via secure HttpOnly cookie or localStorage fallback
   const checkSession = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const savedToken = localStorage.getItem('lunatic_token');
+      const headers: Record<string, string> = {};
+      if (savedToken) {
+        headers['Authorization'] = `Bearer ${savedToken}`;
+      }
+      
+      const res = await fetch('/api/auth/me', { headers });
       const data = await res.json();
       if (res.ok && data.user) {
         setUser(data.user);
-        setToken(data.token || null);
+        const newToken = data.token || savedToken;
+        setToken(newToken);
+        if (newToken) {
+          localStorage.setItem('lunatic_token', newToken);
+        }
       } else {
         setToken(null);
         setUser(null);
+        localStorage.removeItem('lunatic_token');
       }
     } catch (err) {
       console.error('Session validation failed:', err);
       setToken(null);
       setUser(null);
+      localStorage.removeItem('lunatic_token');
     } finally {
       setAuthLoading(false);
     }
@@ -500,6 +512,7 @@ export default function App() {
   }, [user, token, activeTab]);
 
   const handleLoginSuccess = (newToken: string, loggedInUser: any) => {
+    localStorage.setItem('lunatic_token', newToken);
     setToken(newToken);
     setUser(loggedInUser);
     setActiveTab('home');
@@ -507,12 +520,16 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      const savedToken = localStorage.getItem('lunatic_token');
+      const headers = savedToken ? { 'Authorization': `Bearer ${savedToken}` } : undefined;
       await fetch('/api/auth/logout', {
-        method: 'POST'
+        method: 'POST',
+        headers
       });
     } catch (err) {
       console.error('Logout error:', err);
     }
+    localStorage.removeItem('lunatic_token');
     setToken(null);
     setUser(null);
     setActiveTab('home');
