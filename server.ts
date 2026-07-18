@@ -31,7 +31,7 @@ import {
 } from './src/types';
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Enable JSON body parsing with large limit for file uploads
 app.use(express.json({ limit: '50mb' }));
@@ -3695,7 +3695,9 @@ function createAndSendNotification(
   }
 }
 
+/*
 app.get('/api/notifications', authenticate, (req, res) => {
+  console.log('DEBUG: /api/notifications called');
   db.notifications = db.notifications || [];
   const user = (req as any).user as User;
   const isStaff = user.role === UserRole.Owner || user.role === UserRole.CoOwner || user.role === UserRole.Recursos;
@@ -3745,6 +3747,7 @@ app.post('/api/notifications/read', authenticate, (req, res) => {
 
   res.json({ success: true });
 });
+*/
 
 // -------------------------------------------------------------
 // CHAT GLOBAL ENDPOINTS & COOLDOWN TRACKING

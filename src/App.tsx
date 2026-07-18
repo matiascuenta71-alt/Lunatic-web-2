@@ -527,21 +527,6 @@ export default function App() {
   const [bellOpen, setBellOpen] = useState(false);
 
   // Fetch notifications
-  const fetchNotifications = async () => {
-    if (!token) return;
-    try {
-      const res = await fetch('/api/notifications', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.notifications || []);
-      }
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-    }
-  };
-
   // Mark all notifications of a type as read
   const markNotificationsAsRead = async (type: string) => {
     if (!token) return;
@@ -649,7 +634,7 @@ export default function App() {
   useEffect(() => {
     if (!token) return;
 
-    fetchNotifications();
+    fetchPlatformData();
 
     let ws: WebSocket | null = null;
     let pingInterval: any;
@@ -713,7 +698,7 @@ export default function App() {
     // Polling fallback: fetch notifications every 20 seconds
     const fallbackInterval = setInterval(() => {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
-        fetchNotifications();
+        // fetchNotifications(); // Removed due to endpoint issues
       }
     }, 20000);
 
