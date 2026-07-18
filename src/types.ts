@@ -30,6 +30,7 @@ export interface User {
   isSuspended: boolean;
   roleExpiresAt?: string; // ISO string when temporary role expires
   originalRole?: UserRole; // Role to restore when temp role expires
+  googleId?: string; // Google identity provider ID
 }
 
 export enum ResourceCategory {

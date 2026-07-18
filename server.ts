@@ -496,13 +496,16 @@ function authenticate(req: express.Request, res: express.Response, next: express
   const reqIp = req.ip || (req.headers['x-forwarded-for'] as string) || '127.0.0.1';
   const reqUserAgent = req.headers['user-agent'] || '';
 
-  // 1. Strict User-Agent Match
+  // 1. Lenient User-Agent Check to prevent random session drops (e.g. background tab sleep, webview shifting)
   if (parsed.userAgent && parsed.userAgent !== reqUserAgent) {
-    logActivity(parsed.id || 'ANÓNIMO', parsed.email || 'unknown', 'SEGURIDAD', `Intento de secuestro de sesión detectado. Navegador no coincide.`, req);
-    res.clearCookie('lunatic_token', { httpOnly: true, secure: true, sameSite: 'none' });
-    if (db.sessions[token]) delete db.sessions[token];
-    res.status(401).json({ error: 'Sesión inválida. Dispositivo no coincide.' });
-    return;
+    const cleanOrig = parsed.userAgent.toLowerCase();
+    const cleanReq = reqUserAgent.toLowerCase();
+    const wasMobile = cleanOrig.includes('mobile') || cleanOrig.includes('android') || cleanOrig.includes('iphone');
+    const isMobile = cleanReq.includes('mobile') || cleanReq.includes('android') || cleanReq.includes('iphone');
+    
+    if (wasMobile !== isMobile && reqUserAgent) {
+      logActivity(parsed.id || 'ANÓNIMO', parsed.email || 'unknown', 'SEGURIDAD_ADVERTENCIA', `Cambio sospechoso de tipo de dispositivo (de móvil a escritorio o viceversa). Original: "${parsed.userAgent}" vs Actual: "${reqUserAgent}"`, req);
+    }
   }
 
   // 2. IP Validation Warning (allows dynamic cellular shifting but flags major anomalies)
@@ -965,6 +968,438 @@ app.post('/api/auth/login', rateLimiter(15, 60000), (req, res) => {
     token,
     user: cleanUser
   });
+});
+
+// -------------------------------------------------------------
+// GOOGLE OAUTH ENDPOINTS
+// -------------------------------------------------------------
+
+// 1. Get Google Auth URL
+app.get('/api/auth/google/url', (req, res) => {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  if (!googleClientId) {
+    res.status(500).json({ error: 'El Client ID de Google no está configurado en el servidor. Configura GOOGLE_CLIENT_ID.' });
+    return;
+  }
+
+  const clientRedirectUri = (req.query.redirect_uri as string) || '';
+  if (!clientRedirectUri) {
+    res.status(400).json({ error: 'Se requiere el parámetro redirect_uri.' });
+    return;
+  }
+
+  // Security CSRF State
+  const statePayload = {
+    csrf: crypto.randomBytes(16).toString('hex'),
+    redirectUri: clientRedirectUri
+  };
+  const state = Buffer.from(JSON.stringify(statePayload)).toString('base64url');
+
+  const params = new URLSearchParams({
+    client_id: googleClientId,
+    redirect_uri: clientRedirectUri,
+    response_type: 'code',
+    scope: 'openid email profile',
+    state: state,
+    prompt: 'select_account'
+  });
+
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  res.json({ url });
+});
+
+// 2. Google OAuth Callback (Popup endpoint)
+app.get(['/api/auth/google/callback', '/api/auth/google/callback/'], async (req, res) => {
+  const { code, state, error: googleError } = req.query;
+
+  // Handle cancellation or Google OAuth error
+  if (googleError) {
+    res.send(`
+      <html>
+        <head>
+          <title>Autenticación Cancelada</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; background: #030306; color: #f1f5f9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+            .card { background: #080911; border: 1px solid #1e293b; padding: 2rem; border-radius: 1rem; max-width: 400px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+            h1 { color: #f43f5e; font-size: 1.25rem; margin-top: 0; }
+            p { color: #94a3b8; font-size: 0.875rem; line-height: 1.5; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Autenticación de Google Cancelada</h1>
+            <p>Se canceló el inicio de sesión o se produjo un error. Puedes cerrar esta ventana e intentarlo de nuevo.</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: 'El inicio de sesión de Google fue cancelado o rechazado.' }, '*');
+                setTimeout(() => window.close(), 3000);
+              }
+            </script>
+          </div>
+        </body>
+      </html>
+    `);
+    return;
+  }
+
+  if (!code || !state) {
+    res.status(400).send('Faltan parámetros obligatorios en la respuesta de Google (code o state).');
+    return;
+  }
+
+  let redirectUri = '';
+  try {
+    const decodedState = JSON.parse(Buffer.from(state as string, 'base64url').toString('utf-8'));
+    redirectUri = decodedState.redirectUri;
+  } catch (e) {
+    res.status(400).send('Estado CSRF de Google inválido o corrupto.');
+    return;
+  }
+
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!googleClientId || !googleClientSecret) {
+    res.status(500).send('Las credenciales de Google OAuth no están configuradas en el servidor. Configura GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET.');
+    return;
+  }
+
+  try {
+    // Exchange Auth Code for tokens
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        code: code as string,
+        client_id: googleClientId,
+        client_secret: googleClientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code'
+      }).toString()
+    });
+
+    if (!tokenRes.ok) {
+      const errorText = await tokenRes.text();
+      console.error('Error intercambiando código de Google:', errorText);
+      res.status(500).send('Error de comunicación con los servidores de Google.');
+      return;
+    }
+
+    const tokenData = await tokenRes.json();
+    const accessToken = tokenData.access_token;
+
+    if (!accessToken) {
+      res.status(400).send('No se recibió el token de acceso de Google.');
+      return;
+    }
+
+    // Fetch user profile info using the access token
+    const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (!profileRes.ok) {
+      res.status(500).send('Error al obtener la información de perfil de Google.');
+      return;
+    }
+
+    const profile = await profileRes.json();
+    const { sub, email, name, picture } = profile;
+
+    if (!email) {
+      res.status(400).send('No se pudo recuperar el correo electrónico de tu cuenta de Google.');
+      return;
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if there is a logged-in user in the session to perform link
+    let loggedInUser: any = null;
+    let sessionToken = req.headers.authorization?.split(' ')[1];
+    if (!sessionToken) {
+      const cookies = (req.headers.cookie || '').split(';').reduce((acc, c) => {
+        const parts = c.trim().split('=');
+        const k = parts[0];
+        const v = parts.slice(1).join('=');
+        if (k && v) acc[k] = decodeURIComponent(v);
+        return acc;
+      }, {} as Record<string, string>);
+      sessionToken = cookies['lunatic_token'] || '';
+    }
+
+    if (sessionToken) {
+      const parsed = verifySignedToken(sessionToken);
+      if (parsed) {
+        const userId = db.sessions[sessionToken];
+        if (userId) {
+          loggedInUser = db.users.find(u => u.id === userId);
+        }
+      }
+    }
+
+    let userRecord: any = null;
+
+    if (loggedInUser) {
+      // Flow 1: Account Linking (User is currently logged in)
+      const existingWithGoogle = db.users.find(u => u.googleId === sub);
+      if (existingWithGoogle && existingWithGoogle.id !== loggedInUser.id) {
+        // This Google account is already linked to ANOTHER user!
+        res.send(`
+          <html>
+            <head>
+              <title>Error de Vinculación</title>
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; background: #030306; color: #f1f5f9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+                .card { background: #080911; border: 1px solid #e11d48; padding: 2.5rem; border-radius: 1rem; max-width: 450px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3); }
+                h1 { color: #f43f5e; font-size: 1.25rem; margin-top: 0; }
+                p { color: #94a3b8; font-size: 0.875rem; line-height: 1.6; }
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <h1>Cuenta de Google ya Vinculada</h1>
+                <p>Esta cuenta de Google ya se encuentra asociada a otro usuario en nuestra plataforma. Por favor, utiliza otra cuenta o contacta con administración.</p>
+                <script>
+                  if (window.opener) {
+                    window.opener.postMessage({ type: 'OAUTH_LINK_ERROR', error: 'Esta cuenta de Google ya está vinculada a otro usuario.' }, '*');
+                    setTimeout(() => window.close(), 4000);
+                  }
+                </script>
+              </div>
+            </body>
+          </html>
+        `);
+        return;
+      }
+
+      // Link Google ID to current logged-in user
+      loggedInUser.googleId = sub;
+      if (!loggedInUser.avatarUrl || loggedInUser.avatarUrl.includes('dicebear.com')) {
+        loggedInUser.avatarUrl = picture || loggedInUser.avatarUrl;
+      }
+      saveDB();
+      logActivity(loggedInUser.id, loggedInUser.email, 'VINCULACION_GOOGLE', 'Cuenta vinculada exitosamente con Google desde el perfil', req);
+      userRecord = loggedInUser;
+
+      res.send(`
+        <html>
+          <head>
+            <title>Vinculación Exitosa</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; background: #030306; color: #f1f5f9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+              .card { background: #080911; border: 1px solid #10b981; padding: 2.5rem; border-radius: 1rem; max-width: 450px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3); }
+              h1 { color: #10b981; font-size: 1.25rem; margin-top: 0; }
+              p { color: #94a3b8; font-size: 0.875rem; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h1>¡Vinculación Completada!</h1>
+              <p>Tu cuenta ha sido vinculada correctamente con Google. Ahora puedes iniciar sesión rápidamente con un solo clic.</p>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({ 
+                    type: 'OAUTH_LINK_SUCCESS', 
+                    user: ${JSON.stringify({
+                      id: userRecord.id,
+                      email: userRecord.email,
+                      username: userRecord.username,
+                      role: userRecord.role,
+                      isVerified: userRecord.isVerified,
+                      createdAt: userRecord.createdAt,
+                      avatarUrl: userRecord.avatarUrl,
+                      profileBackground: userRecord.profileBackground,
+                      isSuspended: userRecord.isSuspended,
+                      googleId: userRecord.googleId
+                    })}
+                  }, '*');
+                  setTimeout(() => window.close(), 2500);
+                }
+              </script>
+            </div>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    // Flow 2: Authentication / Login / Automatic Registration (User is not logged in)
+    // 1. Try to find user by googleId
+    userRecord = db.users.find(u => u.googleId === sub);
+
+    if (!userRecord) {
+      // 2. Try to find user by email
+      userRecord = db.users.find(u => u.email.toLowerCase() === normalizedEmail);
+
+      if (userRecord) {
+        // Link Google ID to existing email account automatically since Google pre-verified the email
+        userRecord.googleId = sub;
+        if (!userRecord.avatarUrl || userRecord.avatarUrl.includes('dicebear.com')) {
+          userRecord.avatarUrl = picture || userRecord.avatarUrl;
+        }
+        saveDB();
+        logActivity(userRecord.id, userRecord.email, 'VINCULACION_GOOGLE', 'Cuenta vinculada exitosamente con Google al iniciar sesión', req);
+      } else {
+        // 3. Register a brand new user
+        const id = crypto.randomUUID();
+        
+        // Normalize Google Name into a valid username: length 3-30, letters, numbers, hyphens, underscores
+        let baseUsername = name ? name.replace(/[^a-zA-Z0-9_\-]/g, '_') : 'Usuario';
+        if (baseUsername.length < 3) baseUsername += '_lunatic';
+        if (baseUsername.length > 25) baseUsername = baseUsername.slice(0, 25);
+
+        // Enforce username uniqueness
+        let uniqueUsername = baseUsername;
+        let attempts = 0;
+        while (db.users.find(u => u.username.toLowerCase() === uniqueUsername.toLowerCase()) && attempts < 100) {
+          uniqueUsername = `${baseUsername}_${crypto.randomInt(100, 999)}`;
+          attempts++;
+        }
+
+        const isImmutableOwner = IMMUTABLE_OWNERS.includes(normalizedEmail);
+        const userRole = isImmutableOwner ? UserRole.Owner : UserRole.Usuario;
+
+        const newUser: User = {
+          id,
+          email: normalizedEmail,
+          username: uniqueUsername,
+          role: userRole,
+          isVerified: true,
+          createdAt: new Date().toISOString(),
+          isSuspended: false,
+          avatarUrl: picture || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(uniqueUsername)}`,
+          profileBackground: 'bg-slate-900',
+          googleId: sub
+        };
+
+        const passwordHash = hashPassword('google-oauth-' + crypto.randomBytes(32).toString('hex'));
+        db.users.push({ ...newUser, passwordHash });
+        userRecord = db.users.find(u => u.id === id)!;
+        saveDB();
+        logActivity(userRecord.id, userRecord.email, 'REGISTRO_GOOGLE', 'Usuario registrado con éxito utilizando Google Sign-In', req);
+      }
+    }
+
+    // Check if suspended
+    if (userRecord.isSuspended) {
+      res.send(`
+        <html>
+          <head>
+            <title>Acceso Denegado</title>
+            <style>
+              body { font-family: system-ui, -apple-system, sans-serif; background: #030306; color: #f1f5f9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+              .card { background: #080911; border: 1px solid #f43f5e; padding: 2.5rem; border-radius: 1rem; max-width: 450px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3); }
+              h1 { color: #f43f5e; font-size: 1.25rem; margin-top: 0; }
+              p { color: #94a3b8; font-size: 0.875rem; line-height: 1.6; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h1>Cuenta Suspendida</h1>
+              <p>Tu cuenta de Lunatic Community se encuentra suspendida. Contacta con soporte para apelar esta decisión.</p>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: 'Tu cuenta de Lunatic se encuentra suspendida.' }, '*');
+                  setTimeout(() => window.close(), 3500);
+                }
+              </script>
+            </div>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    // Automatically enforce Owner role for anyone in IMMUTABLE_OWNERS list to prevent caching/out-of-sync issues
+    if (IMMUTABLE_OWNERS.includes(userRecord.email.toLowerCase())) {
+      if (userRecord.role !== UserRole.Owner) {
+        userRecord.role = UserRole.Owner;
+        saveDB();
+      }
+    }
+
+    // Generate a self-healing active Session Token containing full user metadata and browser fingerprint
+    const tokenPayload = {
+      id: userRecord.id,
+      email: userRecord.email,
+      username: userRecord.username,
+      role: userRecord.role,
+      isVerified: userRecord.isVerified,
+      createdAt: userRecord.createdAt,
+      avatarUrl: userRecord.avatarUrl,
+      profileBackground: userRecord.profileBackground,
+      isSuspended: userRecord.isSuspended,
+      passwordHash: userRecord.passwordHash,
+      ip: req.ip || (req.headers['x-forwarded-for'] as string) || '127.0.0.1',
+      userAgent: req.headers['user-agent'] || '',
+      googleId: userRecord.googleId
+    };
+    const token = createSignedToken(tokenPayload);
+    db.sessions[token] = userRecord.id;
+    saveDB();
+
+    logActivity(userRecord.id, userRecord.email, 'LOGIN', 'Inicio de sesión con Google exitoso', req);
+
+    res.cookie('lunatic_token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    });
+
+    const cleanUser = {
+      id: userRecord.id,
+      email: userRecord.email,
+      username: userRecord.username,
+      role: userRecord.role,
+      isVerified: userRecord.isVerified,
+      createdAt: userRecord.createdAt,
+      avatarUrl: userRecord.avatarUrl,
+      profileBackground: userRecord.profileBackground,
+      isSuspended: userRecord.isSuspended,
+      googleId: userRecord.googleId
+    };
+
+    res.send(`
+      <html>
+        <head>
+          <title>Inicio de Sesión Exitoso</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; background: #030306; color: #f1f5f9; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+            .card { background: #080911; border: 1px solid #10b981; padding: 2.5rem; border-radius: 1rem; max-width: 400px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3); }
+            h1 { color: #10b981; font-size: 1.25rem; margin-top: 0; }
+            p { color: #94a3b8; font-size: 0.875rem; line-height: 1.6; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>¡Inicio de Sesión Exitoso!</h1>
+            <p>Se ha iniciado sesión correctamente como ${userRecord.username}. Esta ventana se cerrará automáticamente.</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ 
+                  type: 'OAUTH_AUTH_SUCCESS', 
+                  token: ${JSON.stringify(token)},
+                  user: ${JSON.stringify(cleanUser)}
+                }, '*');
+                setTimeout(() => window.close(), 1500);
+              } else {
+                window.location.href = '/';
+              }
+            </script>
+          </div>
+        </body>
+      </html>
+    `);
+
+  } catch (error: any) {
+    console.error('Error durante la autenticación con Google:', error);
+    res.status(500).send('Error interno durante el procesamiento de Google OAuth: ' + error.message);
+  }
 });
 
 // LOGOUT
@@ -3753,12 +4188,17 @@ async function startServer() {
             return;
           }
 
-          // Validate fingerprint binding for WebSocket connection
+          // Validate fingerprint binding for WebSocket connection (Lenient check)
           const wsUserAgent = req ? req.headers['user-agent'] || '' : '';
           if (parsed.userAgent && parsed.userAgent !== wsUserAgent) {
-            ws.send(JSON.stringify({ type: 'error', message: 'Firma de dispositivo/navegador no coincide.' }));
-            ws.close();
-            return;
+            const cleanOrig = parsed.userAgent.toLowerCase();
+            const cleanWS = wsUserAgent.toLowerCase();
+            const wasMobile = cleanOrig.includes('mobile') || cleanOrig.includes('android') || cleanOrig.includes('iphone');
+            const isMobile = cleanWS.includes('mobile') || cleanWS.includes('android') || cleanWS.includes('iphone');
+            
+            if (wasMobile !== isMobile && wsUserAgent) {
+              logActivity(parsed.id || 'ANÓNIMO', parsed.email || 'unknown', 'SEGURIDAD_ADVERTENCIA', `Conexión de Chat (WebSocket) iniciada con un tipo de dispositivo diferente.`, req as any);
+            }
           }
 
           let userId = db.sessions[token];
